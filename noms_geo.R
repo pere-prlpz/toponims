@@ -1,6 +1,9 @@
 #scripts per importar el fitxer de noms geogràfics de l'ICGC i pujar-lo a Wikidata
 
-#PER FER: especificar columnes de text (a codis municipis i comarques) per evitar que el merge vagi malament
+
+## script per funcionar
+
+#importar noms geogràfics de Catalunya
 ngcatv10cs0f1r011 <- read.csv("~/DADES/pere/varis/ngcatv10cs0f1r011.txt", sep=";", colClasses = "character")
 ngcatv10cs0f1r011$UTMX_ETRS89 <- as.numeric(ngcatv10cs0f1r011$UTMX_ETRS89)
 ngcatv10cs0f1r011$UTMY_ETRS89 <- as.numeric(ngcatv10cs0f1r011$UTMY_ETRS89)
@@ -24,25 +27,6 @@ spgeo.df <- as.data.frame(spgeo)
 names(spgeo.df) <- c("lon", "lat")
 nomred <- cbind(nomred, spgeo.df)
 
-# mapes per comparar
-library(leaflet)
-mapa <- function(df) {
-  m <- leaflet()
-  m <- addTiles(m)
-  m <- addMarkers(m, lng=df$lon, lat=df$lat, popup=df$Toponim)
-  return(m)
-}
-
-papiol <- nomred[nomred$NomMun1=="el Papiol",]
-
-mapa(papiol)
-View(papiol[order(papiol$Toponim),])
-
-alins <- nomred[nomred$NomMun1=="Alins",]
-mapa(alins)
-
-bas <- nomred[nomred$CodiMun1=="172076",]
-mapa(bas)
 
 # carregar de Wikidata
 #funcions carregar topònims
@@ -112,6 +96,60 @@ distgeo <- function(lat.x, lon.x, lat.y, lon.y) {
 units$dist <- with(units, distgeo(lat.x, lon.x, lat.y, lon.y))
 summary(units$dist)
 hist(log10(units$dist), breaks="scott")
+with(units, table(instLabel, Concepte))
+
+# elimino aparellaments entre coses diferents 
+units <- units[!(units$Concepte=="edif." & units$instLabel %in% c("disseminat", "assentament humà")),]
+units <- units[!(units$Concepte=="hidr." & !grepl("^(llac|font|badia|riu)",units$instLabel)),]
+units <- units[!(grepl("^(cim|orogr.)", units$Concepte) & !grepl("^(muntanya)", units$instLabel)),]
+
+
+# funció per preparar quickstatements
+afegeix <- function(llista, vector) {
+  llista[[1+length(llista)]] <- vector
+  return(llista)
+}
+
+
+# preparar quickstatemens
+quick <- function(fila) {
+  instr <- list()
+  instr <- afegeix(instr, c(paste0("-",fila$quitem), "P625", paste0("@", fila$lat.x,"/", fila$lon.x)))
+  instr <- afegeix(instr, c(fila$quitem, "P625", paste0("@", fila$lat.y,"/", fila$lon.y),
+                            "S248", "Q98463667"))
+  instr <- sapply(instr, FUN=paste, collapse="\t")
+  return (instr)
+}
+
+crear <- units[units$dist>.3,]
+crear$quitem <- gsub("http://www.wikidata.org/entity/", "", crear$item)
+crear <- crear[!duplicated(crear$quitem),]  #trec duplicats per tenir dos municipis o dos P31 a Wikidata
+
+instruccions <- unlist(lapply(1:1000, function(i) {quick(crear[i,])})) #1:nrow(crear)
+cat(paste(instruccions, collapse="\n")) #pantalla
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+
+### script per anàlisi del que fa
+
+# mapes per comparar
+library(leaflet)
+mapa <- function(df) {
+  m <- leaflet()
+  m <- addTiles(m)
+  m <- addMarkers(m, lng=df$lon, lat=df$lat, popup=df$Toponim)
+  return(m)
+}
+
+papiol <- nomred[nomred$NomMun1=="el Papiol",]
+
+mapa(papiol)
+View(papiol[order(papiol$Toponim),])
+
+alins <- nomred[nomred$NomMun1=="Alins",]
+mapa(alins)
+
+bas <- nomred[nomred$CodiMun1=="172076",]
+mapa(bas)
 
 units <- units[order(units$dist),]
 
@@ -140,31 +178,4 @@ mapa2 <- function(df) {
 mapa2(tail(units,50))
 
 table(duplicated(nomred[,c("Toponim","CodiMun1")]))
-
-
-# funció per preparar quickstatements
-afegeix <- function(llista, vector) {
-  llista[[1+length(llista)]] <- vector
-  return(llista)
-}
-
-
-# preparar quickstatemens
-quick <- function(fila) {
-  instr <- list()
-  instr <- afegeix(instr, c(paste0("-",fila$quitem), "P625", paste0("@", fila$lat.x,"/", fila$lon.x)))
-  instr <- afegeix(instr, c(fila$quitem, "P625", paste0("@", fila$lat.y,"/", fila$lon.y),
-                            "S248", "Q98463667"))
-  instr <- sapply(instr, FUN=paste, collapse="\t")
-  return (instr)
-}
-
-crear <- units[units$dist>.3,]
-crear$quitem <- gsub("http://www.wikidata.org/entity/", "", crea$item)
-
-instruccions <- unlist(lapply(51:350, function(i) {quick(crear[i,])})) #1:nrow(crear)
-cat(paste(instruccions, collapse="\n")) #pantalla
-cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
-
-
 
