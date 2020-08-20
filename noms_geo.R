@@ -4,7 +4,13 @@
 ## script per funcionar
 
 #importar noms geogràfics de Catalunya
-ngcatv10cs0f1r011 <- read.csv("~/DADES/pere/varis/ngcatv10cs0f1r011.txt", sep=";", colClasses = "character")
+if (file.exists("~/DADES/pere/varis/ngcatv10cs0f1r011.txt")) {
+  ngcatv10cs0f1r011 <- read.csv("~/DADES/pere/varis/ngcatv10cs0f1r011.txt", 
+                                sep=";", colClasses = "character")
+} else {
+  ngcatv10cs0f1r011 <- read.csv("~/pere/diversos/ngcatv10cs0f1r011.txt", 
+                                sep=";", colClasses = "character")
+}
 ngcatv10cs0f1r011$UTMX_ETRS89 <- as.numeric(ngcatv10cs0f1r011$UTMX_ETRS89)
 ngcatv10cs0f1r011$UTMY_ETRS89 <- as.numeric(ngcatv10cs0f1r011$UTMY_ETRS89)
 summary(ngcatv10cs0f1r011)
@@ -125,9 +131,11 @@ crear <- units[units$dist>.3,]
 crear$quitem <- gsub("http://www.wikidata.org/entity/", "", crear$item)
 crear <- crear[!duplicated(crear$quitem),]  #trec duplicats per tenir dos municipis o dos P31 a Wikidata
 
-instruccions <- unlist(lapply(1:1000, function(i) {quick(crear[i,])})) #1:nrow(crear)
+instruccions <- unlist(lapply(1:nrow(crear), function(i) {quick(crear[i,])})) #1:nrow(crear)
+
 cat(paste(instruccions, collapse="\n")) #pantalla
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
 
 ### script per anàlisi del que fa
 
