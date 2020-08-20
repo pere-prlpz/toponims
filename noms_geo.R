@@ -1,5 +1,6 @@
 #scripts per importar el fitxer de noms geogràfics de l'ICGC i pujar-lo a Wikidata
 
+rm(list=ls())
 
 ## script per funcionar
 
@@ -127,12 +128,18 @@ quick <- function(fila) {
   return (instr)
 }
 
-crear <- units[units$dist>.3,]
+
+# filtrem quins elements volem
+#crear <- units[units$dist>.2,] #tot
+#crear <- units[units$dist>.075 & units$Concepte=="hidr." & units$instLabel=="font",]
+crear <- units[units$dist>.1 & grepl("edif|equip",units$Concepte) & grepl("edif|masia",units$instLabel),] #FALTEN ESGLÉSIES, etc.
+
 crear$quitem <- gsub("http://www.wikidata.org/entity/", "", crear$item)
 crear <- crear[!duplicated(crear$quitem),]  #trec duplicats per tenir dos municipis o dos P31 a Wikidata
 
 instruccions <- unlist(lapply(1:nrow(crear), function(i) {quick(crear[i,])})) #1:nrow(crear)
 
+# sortides per triar
 cat(paste(instruccions, collapse="\n")) #pantalla
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
