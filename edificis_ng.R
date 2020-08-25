@@ -127,6 +127,80 @@ lloctipus <- rbind(lloctipus, oficialedif)
 lloctipus <- lloctipus[!duplicated(lloctipus),]
 length(unique(lloctipus$item))
 
+# busquem duplicats a Wikidata
+
+# treiem paràmetres dels noms
+treupar <- function(nom) {
+  trossos <- strsplit(nom," (", fixed = TRUE)
+  return(trossos[[1]][1])
+}
+
+# treu el/la
+treuart <- function(nom) {
+  gsub("^(el|la|els|les) ","",nom)
+  gsub("^l'","",nom)
+}
+
+lloctipus$nomnet <- sapply(lloctipus$itemLabel, treupar)
+lloctipus$nomrel <- treuart(tolower(lloctipus$nomnet))
+
+#duplicats en els dos sentits
+repetits <- function(x) {duplicated(x)|duplicated(x, fromLast = TRUE)}
+
+repewd <- lloctipus[repetits(lloctipus[c("nomrel", "idescat")]),]
+table(duplicated(repewd$item))
+repewd <- repewd[!duplicated(repewd$item),]
+repewd <- repewd[repetits(repewd[c("nomrel", "idescat")]),]
+repewd <- repewd[order(repewd$nomrel),]
+
+qplant <- function(qurl) {
+  q <- gsub("http://www.wikidata.org/entity/Q", "", qurl)
+  pl <- paste0("*{{Q|",q,"}}", collapse = "\n")
+  return(pl)
+}
+
+# sortida incloent duplicats i homònims
+# cat(qplant(repewd$item))
+paste("wd", repewd$item, sep=":", collapse=" ")
+cat(paste0("*{{Q|", repewd$item, "}} - ", repewd$nomrel, collapse = "\n"), "\n")
+
+# busquem duplicats eliminant els homònims
+
+homonims <- getquery('SELECT DISTINCT ?item ?itemLabel ?noconf ?noconfLabel
+WHERE {
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P1889 ?noconf.
+  ?item wdt:P131 [].
+SERVICE wikibase:label {
+bd:serviceParam wikibase:language "[AUTO_LANGUAGE],ca,oc,eu,gl,en,es,an,eu,pl,sv,ceb" .
+}
+}')
+
+repenohom <- data.frame()
+for (it1 in unique(repewd$item)) {
+  print(it1)
+  homon <- homonims$noconf[homonims$item == it1]
+  propi <- repewd[repewd$item==it1, ]
+  possibles <- repewd[repewd$idescat %in% propi$idescat,]
+  possibles <- possibles[!possibles$item %in% homon,]
+  possibles <- possibles[possibles$item != it1,]
+  possibles <- possibles[possibles$nomrel %in% propi$nomrel,]
+  propi <- propi[propi$nomrel %in% possibles$nomrel,]
+  repenohom <- rbind(repenohom, propi, possibles)
+}
+repenohom <- repenohom[!duplicated(repenohom),]
+
+# trec fosses comunes (homònimes que no marcaré)
+repenohom <- repenohom[!grepl("^fossa comuna:",repenohom$nomrel),]
+
+# per actualitzar (sortida sense homònims)
+paste("wd", repenohom$item, sep=":", collapse=" ")
+cat(paste0("*{{Q|", repenohom$item, "}} - ", repenohom$nomrel, " ", repenohom$item, collapse = "\n"), "\n")
+
+
+
+
+
 #importar noms geogràfics de Catalunya
 if (file.exists("~/DADES/pere/varis/ngcatv10cs0f1r011.txt")) {
   ngcatv10cs0f1r011 <- read.csv("~/DADES/pere/varis/ngcatv10cs0f1r011.txt", 
@@ -172,20 +246,6 @@ for (varmun in varmuns) {
 # i tots els edificis del fitxer de noms geogràfics (nomid)
 # Els preparem per unir-los.
 
-# nom dels nuclis existents
-treupar <- function(nom) {
-  trossos <- strsplit(nom," (", fixed = TRUE)
-  return(trossos[[1]][1])
-}
-
-# treu el/la
-treuart <- function(nom) {
-  gsub("^(el|la|els|les) ","",nom)
-  gsub("^l'","",nom)
-}
-
-lloctipus$nomnet <- sapply(lloctipus$itemLabel, treupar)
-lloctipus$nomrel <- treuart(tolower(lloctipus$nomnet))
 nomid$nomrel <- treuart(tolower(nomid$Toponim))
 
 #1- unim per nom i municipi
@@ -195,6 +255,7 @@ units <- merge(lloctipus, nomid, by=c("nomrel","idescat"))
 table(is.na(units$lat.x))
 units[is.na(units$lat.x),]
 table(duplicated(units[, names(units)[names(units)!="itemLabel"]]))
+
 units <- units[!duplicated(units[, names(units)[names(units)!="itemLabel"]]),]
 
 #busquem possibles duplicats
@@ -215,6 +276,10 @@ qplant <- function(qurl) {
 
 cat(qplant(unitsrepe$item))
 paste("wd", unitsrepe$item, sep=":", collapse=" ")
+
+
+
+
 
 with(units, table(nomtipus, Concepte))
 units[units$nomtipus=="obra escultòrica",]
