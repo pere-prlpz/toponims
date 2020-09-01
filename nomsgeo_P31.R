@@ -49,6 +49,7 @@ partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804
              "Q12600", "Q13948", "Q14303", "Q15348", "Q15351")
 
 # baixa tots els elements d'un lloc de Catalunya, incloent sense tipus
+# REVISAR: TREURE ESTAT PER NO PERDRE ELS QUE NO TENEN NI AIXÒ
 totlloc <- function(qlloc) {
   url <- paste0("SELECT ?item ?itemLabel ?tipus ?tipusLabel ?lat ?lon ?mun ?idescat
 WHERE {
