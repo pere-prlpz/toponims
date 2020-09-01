@@ -83,9 +83,30 @@ for (lloc in partcat) {
 }
 totcat <- totcat[!duplicated(totcat),]
 
+monuments <- getquery("SELECT ?item ?itemLabel ?tipus ?tipusLabel ?lat ?lon ?mun ?idescat
+WHERE {
+  ?item wdt:P1600 [].
+  OPTIONAL {?item wdt:P31 ?tipus.}
+    ?item wdt:P131* ?mun.
+    ?mun wdt:P4335 ?idescat.
+  OPTIONAL {
+?item p:P625 ?coordinate .
+?coordinate psv:P625 ?coordinate_node .
+?coordinate_node wikibase:geoLatitude ?lat .
+?coordinate_node wikibase:geoLongitude ?lon .
+  }
+SERVICE wikibase:label {
+bd:serviceParam wikibase:language 'ca,oc,en,es,pl,sv,ceb'.
+}
+}")
+
+totcat <- rbind(totcat, monuments)
+totcat <- totcat[!duplicated(totcat),]
+
 classeswd <- getquery('SELECT DISTINCT ?tipus ?nomtipus
 WHERE {
-?tipus wdt:P279* wd:Q811979.
+  VALUES ?generes {wd:Q811979 wd:Q3395377}
+?tipus wdt:P279* ?generes.
 SERVICE wikibase:label {
 bd:serviceParam wikibase:language "ca,ca,en,es,fr,eu,de,sv" .
 ?tipus rdfs:label ?nomtipus
@@ -111,6 +132,7 @@ WHERE {
 aliesedif <- merge(lloctipus, alies, by="item")
 aliesedif$itemLabel <- aliesedif$alias
 aliesedif$alias <- NULL
+aliesedif <- aliesedif[!duplicated(aliesedif),]
 lloctipus <- rbind(lloctipus, aliesedif)
 lloctipus <- lloctipus[!duplicated(lloctipus),]
 
@@ -143,6 +165,11 @@ treuart <- function(nom) {
 
 lloctipus$nomnet <- sapply(lloctipus$itemLabel, treupar)
 lloctipus$nomrel <- treuart(tolower(lloctipus$nomnet))
+lloctipus <- lloctipus[nchar(lloctipus$idescat)>2,] # això potser s'hauria d'haver fet abans
+
+######################################################################
+# buscar duplicats a Wikidata per eliminar-los
+######################################################################
 
 #duplicats en els dos sentits
 repetits <- function(x) {duplicated(x)|duplicated(x, fromLast = TRUE)}
@@ -197,9 +224,9 @@ repenohom <- repenohom[!grepl("^fossa comuna:",repenohom$nomrel),]
 paste("wd", repenohom$item, sep=":", collapse=" ")
 cat(paste0("*{{Q|", repenohom$item, "}} - ", repenohom$nomrel, " ", repenohom$item, collapse = "\n"), "\n")
 
-
-
-
+##############################################
+# Carregar noms geogràfics per importar-los
+###############################################
 
 #importar noms geogràfics de Catalunya
 if (file.exists("~/DADES/pere/varis/ngcatv10cs0f1r011.txt")) {
@@ -256,35 +283,217 @@ table(is.na(units$lat.x))
 units[is.na(units$lat.x),]
 table(duplicated(units[, names(units)[names(units)!="itemLabel"]]))
 
+# traiem els que siguin duplicats només per tenir dos noms
 units <- units[!duplicated(units[, names(units)[names(units)!="itemLabel"]]),]
 
-#busquem possibles duplicats
+##################################################################
+# Buscar coincidents per pujar coordenades als que ja siguin a Wikidata sense coordenades
+##############################################################
 
-#duplicats en els dos sentits
+#duplicats en els dos sentits (COMPTE: ja definit més amunt)
 repetits <- function(x) {duplicated(x)|duplicated(x, fromLast = TRUE)}
 
-unitsrepe <- units[repetits(units[c("nomrel", "idescat")]),]
-table(duplicated(unitsrepe$item))
-unitsrepe <- unitsrepe[!duplicated(unitsrepe$item),]
-unitsrepe <- unitsrepe[repetits(unitsrepe[c("nomrel", "idescat")]),]
-
-qplant <- function(qurl) {
-  q <- gsub("http://www.wikidata.org/entity/Q", "", qurl)
-  pl <- paste0("*{{Q|",q,"}}", collapse = "\n")
-  return(pl)
-}
-
-cat(qplant(unitsrepe$item))
-paste("wd", unitsrepe$item, sep=":", collapse=" ")
-
-
-
-
-
+#tafanejar
 with(units, table(nomtipus, Concepte))
 units[units$nomtipus=="obra escultòrica",]
 units[grep("estació", units$nomtipus),]
 #pugem coordenades
 
 #busquem els que són a ng i no a wd
+
+# primer netegem els no segurs per potencials homònims
+table(duplicated(units[,c("item","id")]))  
+crear <- units[!duplicated(units[,c("item","id")]),]
+table(repetits(crear[,c("nomrel","idescat"),]))
+head(crear[(repetits(crear[,c("nomrel","idescat"),])),])
+crear <- crear[!(repetits(crear[,c("nomrel","idescat"),])),]
+
+# triem sense coordenades
+crear <- crear[is.na(crear$lat.x),]
+# comprovacions redundants per si de cas:
+table(duplicated(crear[,c("id", "item")]))
+table(duplicated(crear[,c("UTMX_ETRS89", "UTMY_ETRS89")]))
+crear <- crear[!duplicated(crear[,c("id", "item")]),]
+table(duplicated(crear$item))
+table(repetits(crear$item))
+crear[repetits(crear$item),]#revisar a mà
+crear <- crear[!repetits(crear$item),]
+crear[grepl("escult",crear$tipusLabel),]
+crear <- crear[!grepl("escult",crear$tipusLabel),] #evitar escultures mobles
+
 #els pugem
+# preparar quickstatemens
+quickcoor <- function(fila) {
+  instr <- list()
+  instr[[1]] <- c(fila$item, "P625", 
+                  paste0("@", fila$lat.y,"/", fila$lon.y),
+                  "S248", "Q98463667")
+  instr <- sapply(instr, FUN=paste, collapse="\t")
+  return (instr)
+}
+
+instruccions <- unlist(lapply(1:nrow(crear), function(i) {quickcoor(crear[i,])}))
+cat(paste(instruccions, collapse="\n")) #pantalla
+
+# PER FER: MIRAR ELS QUE NO S'HAN PUJAT PERQUÈ TENEN HOMÒNIMS A WIKIDATA O AL FITXER
+
+##################################################################
+# Buscar els que no siguin a Wikidata per pujar-los
+##############################################################
+
+quedenng <- nomid[!nomid$id %in% units$id,]
+
+
+#eliminem amb menys coincidència de noms
+treupart <- function(nom) {
+  nou <- trimws(gsub("(^| )((el|la|els|les|en|na) |[ln]')"," ",nom))
+  nou <- trimws(gsub("(^| )((de|del|dels) |d')"," ",nou))
+  return(nou)
+}
+treuparaula <- function(paraula, nom) {
+  expreg <- paste0("(^| )(", paraula,")( |$)")
+  nou <- trimws(gsub(expreg," ",nom))
+  nou <- gsub("  *"," ", nou)
+  return(nou)
+}
+
+pelanom <- function(nom){
+  nou <- nom
+  nou <- gsub("mare de déu|verge|nostra senyora", "santa maria", nou)
+  nou <- treupart(nou)
+  nou <- treuparaula(
+    paste("església|ermita|convent|santuari|parròquia|capella|basílica|monestir",
+          "mas|masia|can|ca|cal|casa|torre|finca|palau|seu", sep="|"), nou)
+  nou <- treuparaula(
+    paste("església|ermita|convent|santuari|parròquia|capella|basílica|monestir",
+          "mas|masia|can|ca|cal|palau|seu|antiga|pairal|reial", sep="|"), nou)
+  return(nou)
+}
+
+#codi municipi
+idescat <- getquery("SELECT ?lloc ?llocLabel ?idescat 
+WHERE {
+  ?lloc wdt:P4335 ?idescat.
+  SERVICE wikibase:label {bd:serviceParam wikibase:language 'ca' .}
+}")
+
+#sense tenir en compte municipi seria:
+#quedenng <- quedenng[!pelanom(quedenng$nomrel) %in% pelanom(lloctipus$nomrel),]
+
+quedenng <- nomid[!nomid$id %in% units$id,]
+pelatng <- quedenng[, c("id", "idescat", "nomrel")]
+pelatng$nompelat <- pelanom(pelatng$nomrel)
+pelatwd <- lloctipus[, c("item", "idescat", "nomrel"),]
+pelatwd <- merge(pelatwd, idescat)
+pelatwd$nompelat <- pelanom(pelatwd$nomrel)
+pelatwd$nompelat <- 
+  sapply(1:nrow(pelatwd), 
+         function(i) {
+           treuparaula(pelanom(tolower(pelatwd$llocLabel[i])), pelatwd$nompelat[i])})
+unitspelats <- merge(pelatng, pelatwd, by=c("nompelat", "idescat"))
+quedenng <- quedenng[!quedenng$id %in% unitspelats$id, ]
+quedenng <- merge(quedenng, idescat, by="idescat")
+
+
+# tipus
+tipus <- data.frame(Concepte=c("nucli", "diss.", "barri", "edif.", "edif. hist."),
+                    iconc=c("Q486972","Q16557344","Q123705", "Q41176", "Q35112127"),
+                    dconc=c("Nucli de població",
+                            "Disseminat",
+                            "Barri",
+                            "Edifici",
+                            "Edifici històric"),
+                    dconcen=c("Populated place",
+                              "Populated place",
+                              "Neighborhood",
+                              "Building",
+                              "Historic building"),
+                    stringsAsFactors = FALSE)
+
+#afegir "de"
+de <- function(nom) {
+  if (grepl("^els? ", nom)) {
+    denom <- paste0("d",nom)
+  } else {
+    if (grepl("^[AEIOUÀÈÉÍÒÓÚ]", nom)) {
+      denom <- paste0("d'",nom)
+    } else {
+      denom <- paste0("de ",nom)
+    }
+  }
+  return(denom)
+}
+
+# afegir cometes
+cometes <- function(text) {
+  paste0('"',text,'"')
+}
+
+# funció per preparar quickstatements
+afegeix <- function(llista, vector) {
+  llista[[1+length(llista)]] <- vector
+  return(llista)
+}
+
+# preparar quickstatemens
+quick <- function(fila) {
+  instr <- list(c("CREATE"))
+  instr <- afegeix(instr,c("LAST", "Lca", cometes(fila$Toponim)))  
+  instr <- afegeix(instr,c("LAST", "Dca", 
+                           cometes(paste0(fila$dconc, " ",
+                                          de(fila$llocLabel)))))  
+  instr <- afegeix(instr, c("LAST", "P31", fila$iconc, "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P131", fila$lloc, "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P625", 
+                            paste0("@", fila$lat,"/", fila$lon),
+                            "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P17", "Q29"))  
+  instr <- afegeix(instr, c("LAST", "Len", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Loc", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Leu", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lfr", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lpt", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lde", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Den", 
+                            paste0('"',fila$dconcen,
+                                   " in ", fila$llocLabel,
+                                   " (Catalonia)",'"')))  
+  instr <- sapply(instr, FUN=paste, collapse="\t")
+  return (instr)
+}
+
+
+#mirem
+
+municipi = "Gavà"
+leafmun <- idescat$idescat[idescat$llocLabel==municipi]
+leafwd <- lloctipus[lloctipus$idescat==leafmun,]
+leafwd <- leafwd[!duplicated(leafwd$item),]
+leafng <- quedenng[quedenng$idescat==leafmun,]
+
+# desaparellats de wikidata en vermell, nomenclàtor en blau
+library(leaflet)
+m <- leaflet()
+m <- addTiles(m)
+m <- addCircleMarkers(m, lng=leafng$lon, lat=leafng$lat, popup=leafng$Toponim)
+m <- addCircleMarkers(m, lng=leafwd$lon, lat=leafwd$lat, popup=leafwd$itemLabel, color = "red")
+m
+
+leafwd$itemLabel[is.na(leafwd$lat)]
+#data.frame(leafng$nomrel, pelanom(leafng$nomrel))
+# fi mirem
+
+
+
+crear <- quedenng[quedenng$llocLabel==municipi,]
+#crear <- crear[-c(14),] #eliminar aquesta línia
+crear <- merge(crear, tipus)
+crear$Toponim
+
+
+instruccions <- unlist(lapply(1:nrow(crear), function(i) {quick(crear[i,])})) #1:nrow(crear)
+
+# sortides per triar
+cat(paste(instruccions, collapse="\n")) #pantalla
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
