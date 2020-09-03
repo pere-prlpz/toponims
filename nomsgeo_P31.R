@@ -1,4 +1,5 @@
-#scripts per importar el fitxer de noms geogràfics de l'ICGC i pujar-lo a Wikidata
+#script per buscar elements sense P31 i afegir-l'hi a través del fitxer de noms geogràfics
+
 rm(list=ls())
 
 library(httr)
@@ -51,9 +52,9 @@ partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804
 # baixa tots els elements d'un lloc de Catalunya, incloent sense tipus
 # REVISAR: TREURE ESTAT PER NO PERDRE ELS QUE NO TENEN NI AIXÒ
 totlloc <- function(qlloc) {
-  url <- paste0("SELECT ?item ?itemLabel ?tipus ?tipusLabel ?lat ?lon ?mun ?idescat
+  url <- paste0("SELECT ?item ?itemLabel ?tipus ?tipusLabel ?estat ?lat ?lon ?mun ?idescat
 WHERE {
-  ?item wdt:P17 wd:Q29.
+  OPTIONAL {?item wdt:P17 ?estat.}
   ?item wdt:P131*wd:",qlloc,".
   OPTIONAL {?item wdt:P31 ?tipus.}
     ?item wdt:P131* ?mun.
@@ -76,7 +77,7 @@ bd:serviceParam wikibase:language 'ca,oc,en,es,pl,sv,ceb'.
   return(resum)
 }
 
-#carregar de Wikidata tots els elements de Catalunya amb P131,incloent sense P31
+#carregar de Wikidata tots els elements de Catalunya amb P131,incloent sense P31 i sense P17
 totcat <- data.frame()
 for (lloc in partcat) {
   print(lloc)
@@ -87,6 +88,9 @@ totcat <- totcat[!duplicated(totcat),]
 head(totcat)
 
 table(is.na(totcat$tipus))
+table(is.na(totcat$estat))
+table(is.na(totcat$tipus),is.na(totcat$estat))
+
 
 sense <- totcat[is.na(totcat$tipus),]
 
@@ -106,8 +110,8 @@ qplant <- function(text) {
   paste0("{{Q|",substring(text,2),"}}")
 }
 
-cat(with(autounits,
-     paste("*", qplant(item.x), qplant(item.y), qplant(tipus.y), dist, collapse="\n")))
+cat(with(autounits[order(autounits$item.x),],
+     paste("*", qplant(item.x), qplant(item.y), qplant(tipus.y), round(dist,3), collapse="\n")))
 
 # mirem els no duplicats per tractar-los amb els noms geogràfics
 table(sense$item %in% autounits$item.x)
@@ -163,24 +167,37 @@ units <- merge(sense, nomid, by=c("nomrel", "idescat"))
 units$dist <- with(units, distgeo(lat.x, lon.x, lat.y, lon.y))
 summary(units$dist)
 
-crear <- units[units$dist < .65,]
+crear <- units[units$dist < .65 & !is.na(units$dist),]
 
 table(crear$Concepte)
 table(crear$CodiGeo)
 cat(paste(sort(unique(crear$CodiGeo)),collapse="\n"))
+cat(paste(sort(unique(crear$Concepte)),collapse="\n"))
 
 # REVISAR: 50601 (rasos)
 dcodis <- "
 10000 Q15303838
+10105 Q674950
 10106 Q11954567
 10301 Q585956
 10401 Q13231610
+20203 Q131596
+20802 Q1068383
+20805 Q1056327
+20904 Q188040
+40201 Q205495
 40203 Q216107
-40405 Q200141
+40405 Q350895
+40406 Q193475
+40410 Q811534
+40502 Q3914
+40505 Q3807410
 40508 Q3918
 40702 Q108325
+40805 Q483110
 40809 Q22746
 40826 Q22698
+40905 Q27108230
 41301 Q17172602
 50102 Q2624046
 50203 Q8502
@@ -202,9 +219,15 @@ dcodis <- "
 50906 Q1350230
 50907 Q143970
 50908 Q6017969
+51003 Q93352
+51008 Q40080
+60104 Q1026259
+60105 Q23397
 60108 Q3253281
 60201 Q6501028
-60304 Q34038"
+60203 Q131681
+60304 Q34038
+60305 Q124714"
 
 qcodis <- as.data.frame(matrix(scan(text=dcodis, what="character"), byrow=TRUE, ncol=2), stringsAsFactors=FALSE)
 names(qcodis) <- c("CodiGeo", "qtipus")
@@ -217,6 +240,28 @@ table(duplicated(crear[,c("item","qtipus")]))
 crear <- crear[!duplicated(crear[,c("item","qtipus")]),]
 
 table(crear$qtipus)
+
+dconc <- "
+cim Q207326
+coll Q133056
+edif. Q41176
+edif._hist. Q35112127
+equip. Q867393
+hidr. Q15324
+indr. Q27096213
+lit. Q12766313
+nucli Q486972
+orogr. Q271669"
+qconc <- as.data.frame(matrix(scan(text=dconc, what="character"), byrow=TRUE, ncol=2), stringsAsFactors=FALSE)
+names(qconc) <- c("Concepte", "qconc")
+qconc$Concepte <- gsub("_"," ",qconc$Concepte, fixed = TRUE)
+table(crear$Concepte %in% qconc$Concepte)
+crear$CodiGeo[!crear$Concepte %in% qconc$Concepte]
+crear[!crear$Concepte %in% qconc$Concepte,]
+crear <- merge(crear, qconc, by="Concepte")
+head(crear)
+table(duplicated(crear[,c("item","qconc")]))
+crear <- crear[!duplicated(crear[,c("item","qconc")]),]
 
 # afegir cometes
 cometes <- function(text) {
@@ -232,7 +277,13 @@ afegeix <- function(llista, vector) {
 # preparar quickstatemens
 quick <- function(fila) {
   instr <- list()
-  instr <- afegeix(instr, c(fila$item, "P31", fila$qtipus, "S248", "Q98463667"))  
+  instr <- afegeix(instr, c(fila$item, "P31", fila$qtipus, "S248", "Q98463667"))
+  if (fila$qconc != fila$qtipus) {
+    instr <- afegeix(instr, c(fila$item, "P31", fila$qconc, "S248", "Q98463667"))
+  }
+  if (is.na(fila$estat)) {
+    instr <- afegeix(instr, c(fila$item, "P17", "Q29"))
+  }
   instr <- sapply(instr, FUN=paste, collapse="\t")
   return (instr)
 }

@@ -269,6 +269,75 @@ for (varmun in varmuns) {
   nomid <- rbind(nomid, nomi)
 }
 
+# hi afegim tipus concret
+dcodis <- "
+10000 Q15303838
+10105 Q674950
+10106 Q11954567
+10301 Q585956
+10302 Q136689
+10401 Q13231610
+10402 Q858177
+20203 Q131596
+20802 Q1068383
+20805 Q1056327
+20904 Q188040
+40201 Q205495
+40203 Q216107
+40401 Q23413
+40405 Q350895
+40406 Q193475
+40408 Q20034791
+40409 Q4989906
+40410 Q811534
+40502 Q3914
+40505 Q3807410
+40508 Q3918
+40702 Q108325
+40705 Q16970
+40805 Q483110
+40809 Q22746
+40826 Q22698
+40905 Q27108230
+41301 Q17172602
+50102 Q2624046
+50203 Q8502
+50302 Q133056
+50303 Q3573216
+50304 Q11914211
+50306 Q150784
+50401 Q11924662
+50501 Q1174791
+50601 Q8502
+50602 Q160091
+50701 Q3323149
+50803 Q35509
+50901 Q4897108
+50902 Q4421
+50903 Q3547603
+50904 Q1616093
+50905 Q11914069
+50906 Q1350230
+50907 Q143970
+50908 Q6017969
+51003 Q93352
+51008 Q40080
+60104 Q1026259
+60105 Q23397
+60108 Q3253281
+60201 Q6501028
+60203 Q131681
+60304 Q34038
+60305 Q124714"
+
+qcodis <- as.data.frame(matrix(scan(text=dcodis, what="character"), byrow=TRUE, ncol=2), stringsAsFactors=FALSE)
+names(qcodis) <- c("CodiGeo", "qtipus")
+
+nomid <- merge(nomid, qcodis, by="CodiGeo", all.x=TRUE)
+
+table(is.na(nomid$qtipus))
+table(nomid$CodiGeo[is.na(nomid$qtipus)])
+
 # ara tenim tots els edificis de WD amb tots els noms (lloctipus) 
 # i tots els edificis del fitxer de noms geogràfics (nomid)
 # Els preparem per unir-los.
@@ -443,6 +512,9 @@ quick <- function(fila) {
                            cometes(paste0(fila$dconc, " ",
                                           de(fila$llocLabel)))))  
   instr <- afegeix(instr, c("LAST", "P31", fila$iconc, "S248", "Q98463667"))  
+  if (!is.na(fila$qtipus)) {
+    instr <- afegeix(instr, c("LAST", "P31", fila$qtipus, "S248", "Q98463667"))
+  }
   instr <- afegeix(instr, c("LAST", "P131", fila$lloc, "S248", "Q98463667"))  
   instr <- afegeix(instr, c("LAST", "P625", 
                             paste0("@", fila$lat,"/", fila$lon),
@@ -465,7 +537,7 @@ quick <- function(fila) {
 
 #mirem
 
-municipi = "Gavà"
+municipi = "Torrelles de Llobregat"
 leafmun <- idescat$idescat[idescat$llocLabel==municipi]
 leafwd <- lloctipus[lloctipus$idescat==leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -489,7 +561,8 @@ crear <- quedenng[quedenng$llocLabel==municipi,]
 #crear <- crear[-c(14),] #eliminar aquesta línia
 crear <- merge(crear, tipus)
 crear$Toponim
-
+table(is.na(crear$qtipus))
+crear[is.na(crear$qtipus),]
 
 instruccions <- unlist(lapply(1:nrow(crear), function(i) {quick(crear[i,])})) #1:nrow(crear)
 
