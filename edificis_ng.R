@@ -448,12 +448,14 @@ quick <- function(quadre) {
 
 
 #per municipi
-municipi = "Vallirana"
-leafmun <- idescat$idescat[idescat$llocLabel==municipi]
-leafwd <- lloctipus[lloctipus$idescat==leafmun,]
+#municipi = "Vilanova del Vallès"
+municipi <- c("Parets del Vallès", "Montmeló", 
+              "Montornés del Vallès", "Vallromanes")
+leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
+leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
-leafng <- quedenng[quedenng$idescat==leafmun,]
-crear <- quedenng[quedenng$llocLabel==municipi,]
+leafng <- quedenng[quedenng$idescat %in% leafmun,]
+crear <- quedenng[quedenng$llocLabel %in% municipi,]
 
 #per comarca
 comarca <- "MAR"
@@ -475,6 +477,11 @@ m <- addTiles(m)
 m <- addCircleMarkers(m, lng=leafng$lon, lat=leafng$lat, popup=leafng$Toponim)
 m <- addCircleMarkers(m, lng=leafwd$lon, lat=leafwd$lat, popup=leafwd$itemLabel, color = "red")
 #m <- addCircleMarkers(m, lng=leafng$lon, lat=leafng$lat, popup=as.character(leafng$id), color="green")
+m <- addRectangles(m, lng1=min(leafwd$lon, na.rm=TRUE), 
+                   lng2=max(leafwd$lon, na.rm=TRUE),
+                   lat1=min(leafwd$lat, na.rm=TRUE), 
+                   lat2=max(leafwd$lat, na.rm=TRUE),
+                   fill=FALSE, color="red")
 m
 
 leafwd$itemLabel[is.na(leafwd$lat)]
@@ -484,6 +491,7 @@ leafwd$itemLabel[is.na(leafwd$lat)]
 # creem
 #crear <- crear[-c(14),] #per eliminar els que sobrin
 crear <- merge(crear, tipus)
+crear[crear$qtipus=="Q585956",c("dconc","dconcen")] <- "masia"
 if (!exists("recents")) {recents <- c()}
 table(crear$id %in% recents)
 crear <- crear[!crear$id %in% recents,]
@@ -492,6 +500,10 @@ crear<- crear[order(crear$Toponim),]
 crear$Toponim
 table(is.na(crear$qtipus))
 crear[is.na(crear$qtipus),]
+
+#crear <- crear[crear$lat>41.512285 & crear$lat<41.545449,]
+#crear <- crear[crear$lat>min(leafwd$lat, na.rm=TRUE) & crear$lat<max(leafwd$lat, na.rm=TRUE)&
+#                 crear$lon>min(leafwd$lon, na.rm=TRUE) & crear$lon<max(leafwd$lon, na.rm=TRUE),]
 
 idmons <- unique(crear$id)
 instruccions <- unlist(lapply(idmons, function(i) {quick(crear[crear$id==i,])})) 
