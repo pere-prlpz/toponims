@@ -448,9 +448,9 @@ quick <- function(quadre) {
 
 
 #per municipi
-#municipi = "Vilanova del Vallès"
-municipi <- c("Parets del Vallès", "Montmeló", 
-              "Montornés del Vallès", "Vallromanes")
+municipi = "Fogars de Montclús"
+#municipi <- c("Parets del Vallès", "Montmeló", 
+#              "Montornés del Vallès", "Vallromanes")
 leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -458,7 +458,7 @@ leafng <- quedenng[quedenng$idescat %in% leafmun,]
 crear <- quedenng[quedenng$llocLabel %in% municipi,]
 
 #per comarca
-comarca <- "MAR"
+comarca <- "VOR"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -500,6 +500,16 @@ crear<- crear[order(crear$Toponim),]
 crear$Toponim
 table(is.na(crear$qtipus))
 crear[is.na(crear$qtipus),]
+
+# Exclou fora del rectangle i un marge
+dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-.5*360/40000 &
+           crear$lon<max(leafwd$lon, na.rm=TRUE)+.5*360/40000 &
+           crear$lon>min(leafwd$lon, na.rm=TRUE)-.5*360/40000)
+table(dins)
+crear <- crear[dins,]
+leafng <- leafng[leafng$id %in% crear$id,]
+
 
 #crear <- crear[crear$lat>41.512285 & crear$lat<41.545449,]
 #crear <- crear[crear$lat>min(leafwd$lat, na.rm=TRUE) & crear$lat<max(leafwd$lat, na.rm=TRUE)&
