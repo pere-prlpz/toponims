@@ -47,14 +47,14 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
 #vegueries <- c("Q18265", "Q249461", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384")
 #comamb <- c("Q12600", "Q13948", "Q14303", "Q15348", "Q15351")
 partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384",
-             "Q12600", "Q13948", "Q14303", "Q15348", "Q15351")
+             "Q12600", "Q13948", "Q14303", "Q15348", "Q15351","Q15352")
 
 # baixa tots els elements d'un lloc de Catalunya
 totlloc <- function(qlloc) {
   url <- paste0("SELECT ?item ?itemLabel ?tipus ?tipusLabel ?lat ?lon ?mun ?idescat
 WHERE {
   ?item wdt:P17 wd:Q29.
-  ?item wdt:P131*wd:",qlloc,".
+  ?item wdt:P131* wd:",qlloc,".
   ?item wdt:P31 ?tipus.
     ?item wdt:P131* ?mun.
     ?mun wdt:P4335 ?idescat.
@@ -447,18 +447,8 @@ quick <- function(quadre) {
 }
 
 
-#per municipi
-municipi = "Fogars de Montclús"
-#municipi <- c("Parets del Vallès", "Montmeló", 
-#              "Montornés del Vallès", "Vallromanes")
-leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
-leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
-leafwd <- leafwd[!duplicated(leafwd$item),]
-leafng <- quedenng[quedenng$idescat %in% leafmun,]
-crear <- quedenng[quedenng$llocLabel %in% municipi,]
-
 #per comarca
-comarca <- "VOR"
+comarca <- "SGA"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -466,6 +456,15 @@ crear <- quedenng[quedenng$idescat %in% leafmun,]
 leafng <- crear
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
+
+#per municipi
+municipi = "Castellví de la Marca"
+#municipi <- c("Castellví de la Marca","Santa Margarida i els Monjos", "Castellet i la Gornal")
+leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
+leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
+leafwd <- leafwd[!duplicated(leafwd$item),]
+leafng <- quedenng[quedenng$idescat %in% leafmun,]
+crear <- quedenng[quedenng$llocLabel %in% municipi,]
 
 
 #mirem
@@ -489,7 +488,6 @@ leafwd$itemLabel[is.na(leafwd$lat)]
 # fi mirem
 
 # creem
-#crear <- crear[-c(14),] #per eliminar els que sobrin
 crear <- merge(crear, tipus)
 crear[crear$qtipus=="Q585956",c("dconc","dconcen")] <- "masia"
 if (!exists("recents")) {recents <- c()}
@@ -498,23 +496,21 @@ crear <- crear[!crear$id %in% recents,]
 crear<- crear[order(crear$Toponim),]
 
 crear$Toponim
+#crear <- crear[-c(14),] #per eliminar els que sobrin
+
 table(is.na(crear$qtipus))
 crear[is.na(crear$qtipus),]
 
 # Exclou fora del rectangle i un marge
-dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
-           crear$lat>min(leafwd$lat, na.rm=TRUE)-.5*360/40000 &
-           crear$lon<max(leafwd$lon, na.rm=TRUE)+.5*360/40000 &
-           crear$lon>min(leafwd$lon, na.rm=TRUE)-.5*360/40000)
+dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+2.5*360/40000 &
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-4*360/40000 &
+           crear$lon<max(leafwd$lon, na.rm=TRUE)+2*360/40000 &
+           crear$lon>min(leafwd$lon, na.rm=TRUE)-2.5*360/40000)
 table(dins)
 crear <- crear[dins,]
 leafng <- leafng[leafng$id %in% crear$id,]
 
-
-#crear <- crear[crear$lat>41.512285 & crear$lat<41.545449,]
-#crear <- crear[crear$lat>min(leafwd$lat, na.rm=TRUE) & crear$lat<max(leafwd$lat, na.rm=TRUE)&
-#                 crear$lon>min(leafwd$lon, na.rm=TRUE) & crear$lon<max(leafwd$lon, na.rm=TRUE),]
-
+# preparar instruccions
 idmons <- unique(crear$id)
 instruccions <- unlist(lapply(idmons, function(i) {quick(crear[crear$id==i,])})) 
 
@@ -586,7 +582,7 @@ cat(paste(instruccions, collapse="\n")) #pantalla
 repetits <- function(x) {duplicated(x)|duplicated(x, fromLast = TRUE)}
 
 repewd <- lloctipus[repetits(lloctipus[c("nomrel", "idescat")]),]
-table(duplicated(repewd$item))
+#table(duplicated(repewd$item))
 repewd <- repewd[!duplicated(repewd$item),]
 repewd <- repewd[repetits(repewd[c("nomrel", "idescat")]),]
 repewd <- repewd[order(repewd$nomrel),]
@@ -599,10 +595,12 @@ qplant <- function(qurl) {
 
 # sortida incloent duplicats i homònims
 # cat(qplant(repewd$item))
-paste("wd", repewd$item, sep=":", collapse=" ")
-cat(paste0("*{{Q|", repewd$item, "}} - ", repewd$nomrel, collapse = "\n"), "\n")
+if (FALSE) {
+  paste("wd", repewd$item, sep=":", collapse=" ")
+  cat(paste0("*{{Q|", repewd$item, "}} - ", repewd$nomrel, collapse = "\n"), "\n")
+}
 
-# busquem duplicats eliminant els homònims
+# busquem duplicats eliminant els homònims (que tenen la propetat de no confondre)
 
 homonims <- getquery('SELECT DISTINCT ?item ?itemLabel ?noconf ?noconfLabel
 WHERE {
@@ -616,7 +614,7 @@ bd:serviceParam wikibase:language "[AUTO_LANGUAGE],ca,oc,eu,gl,en,es,an,eu,pl,sv
 
 repenohom <- data.frame()
 for (it1 in unique(repewd$item)) {
-  print(it1)
+  #print(it1)
   homon <- homonims$noconf[homonims$item == it1]
   propi <- repewd[repewd$item==it1, ]
   possibles <- repewd[repewd$idescat %in% propi$idescat,]
@@ -633,5 +631,23 @@ repenohom <- repenohom[!grepl("^fossa comuna:",repenohom$nomrel),]
 
 # per actualitzar (sortida sense homònims)
 paste("wd", repenohom$item, sep=":", collapse=" ")
+# sortides per triar
 cat(paste0("*{{Q|", repenohom$item, "}} - ", repenohom$nomrel, " ", repenohom$item, collapse = "\n"), "\n")
+cat(enc2utf8(paste0("*{{Q|", repenohom$item, "}} - ", repenohom$nomrel, " ", 
+                        repenohom$item, collapse = "\n")), 
+    file="~/DADES/pere/varis/instruccions.txt")
 
+# preparar sortida amb distància
+repenohom$nomimun <- paste(repenohom$nomrel, repenohom$mun)
+dist <- sqrt((tapply(repenohom$lat, list(repenohom$nomimun), max) - 
+  tapply(repenohom$lat, list(paste(repenohom$nomrel, repenohom$mun)), min))^2 +
+  (tapply(repenohom$lon, list(paste(repenohom$nomrel, repenohom$mun)), max) - 
+     tapply(repenohom$lon, list(paste(repenohom$nomrel, repenohom$mun)), min))^2)
+dist <- dist/180*pi*6371
+dist <- round(dist,3)
+dist <- as.data.frame(dist)
+dist$nomimun <- rownames(dist)
+repenohom <- merge(repenohom, dist, by="nomimun")
+cat(enc2utf8(paste0("*{{Q|", repenohom$item, "}} - ", repenohom$nomrel, " ", 
+                    repenohom$dist, " km", collapse = "\n")), 
+    file="~/DADES/pere/varis/instruccions.txt")
