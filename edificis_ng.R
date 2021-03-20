@@ -317,7 +317,7 @@ quedenng <- nomid[!nomid$id %in% units$id,]
 #eliminem amb menys coincidència de noms
 treupart <- function(nom) {
   nou <- trimws(gsub("(^| )((el|la|els|les|en|na) |[ln]')"," ",nom))
-  nou <- trimws(gsub("(^| )((de|del|dels) |d')"," ",nou))
+  nou <- trimws(gsub("(^| )((de|del|dels|d'en) |d')"," ",nou))
   return(nou)
 }
 treuparaula <- function(paraula, nom) {
@@ -368,6 +368,33 @@ unitspelats <- merge(pelatng, pelatwd, by=c("nompelat", "idescat"))
 quedenng <- quedenng[!quedenng$id %in% unitspelats$id, ]
 quedenng <- merge(quedenng, idescat, by="idescat")
 
+# eliminem duplicats (segurament doble municipi)
+quedenng <- quedenng[!duplicated(quedenng$id,),]
+
+# eliminem repetits a municipis diferents (mateix nom, mateixa comarca i poca distància)
+muncom <- unique(ngcatv10cs0f1r011[ngcatv10cs0f1r011$CodiMun1 != "", c("CodiMun1","CodiCom1")])
+muncom <- muncom[!duplicated(muncom$CodiMun1),]
+names(muncom) <- c("idescat","comarca")
+
+names(quedenng)
+head(quedenng)
+
+pelatcomng <- merge(pelatng[!pelatng$id %in% unitspelats$id, ], muncom, by="idescat")
+pelatcomng <- pelatcomng[pelatcomng$nompelat != "",]
+pelatcomwd <- merge(pelatwd, muncom, by="idescat")
+unitspelatcom <- merge(pelatcomng, pelatcomwd, by=c("comarca", "nompelat"))
+unitspelatcom<-unitspelatcom[!duplicated(unitspelatcom),]
+unitspelatcom <- merge(unitspelatcom, lloctipus[, c("item","lat","lon")], "item")
+unitspelatcom <- merge(unitspelatcom, quedenng[, c("id","lat","lon")], "id")
+
+distancia <- function(lat1,lon1,lat2,lon2) {
+  sqrt((lat1-lat2)^2+((lon1-lon2)*cos((lat1+lat2)/2*pi/180))^2)/180*pi*6371
+}
+
+unitspelatcom$dist <- with(unitspelatcom, distancia(lat.x,lon.x,lat.y,lon.y))
+unitspelatcom <- unitspelatcom[unitspelatcom$dist < .6,]
+unitspelatcom <- unitspelatcom[!is.na(unitspelatcom$dist),]
+quedenng <- quedenng[! quedenng$id %in% unitspelatcom$id,]
 
 # tipus
 tipus <- data.frame(Concepte=c("nucli", "diss.", "barri", "edif.", "edif. hist."),
@@ -446,9 +473,8 @@ quick <- function(quadre) {
   return (instr)
 }
 
-
 #per comarca
-comarca <- "SGA"
+comarca <- "BPE"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -458,8 +484,8 @@ leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
 
 #per municipi
-municipi = "Castellví de la Marca"
-#municipi <- c("Castellví de la Marca","Santa Margarida i els Monjos", "Castellet i la Gornal")
+municipi = "Calafell"
+#municipi <- c("Guixers","la Coma i la Pedra")
 leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -502,9 +528,9 @@ table(is.na(crear$qtipus))
 crear[is.na(crear$qtipus),]
 
 # Exclou fora del rectangle i un marge
-dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+2.5*360/40000 &
-           crear$lat>min(leafwd$lat, na.rm=TRUE)-4*360/40000 &
-           crear$lon<max(leafwd$lon, na.rm=TRUE)+2*360/40000 &
+dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-5*360/40000 &
+           crear$lon<max(leafwd$lon, na.rm=TRUE)+3*360/40000 &
            crear$lon>min(leafwd$lon, na.rm=TRUE)-2.5*360/40000)
 table(dins)
 crear <- crear[dins,]
