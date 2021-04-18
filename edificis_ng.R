@@ -47,7 +47,7 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
 #vegueries <- c("Q18265", "Q249461", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384")
 #comamb <- c("Q12600", "Q13948", "Q14303", "Q15348", "Q15351")
 partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384",
-             "Q12600", "Q13948", "Q14303", "Q15348", "Q15351","Q15352")
+             "Q12600", "Q13948", "Q14303", "Q15348", "Q15351","Q15352") 
 
 # baixa tots els elements d'un lloc de Catalunya
 totlloc <- function(qlloc) {
@@ -333,10 +333,10 @@ pelanom <- function(nom){
   nou <- treupart(nou)
   nom <- gsub("’","'", nou)
   nou <- treuparaula(
-    paste("església|ermita|convent|santuari|parròquia|capella|basílica|monestir",
+    paste("església|ermita|convent|santuari|parr[oò]quial?|capella|basílica|monestir",
           "mas|masia|can|ca|cal|casa|torre|finca|palau|seu", sep="|"), nou)
   nou <- treuparaula(
-    paste("església|ermita|convent|santuari|parròquia|capella|basílica|monestir",
+    paste("església|ermita|convent|santuari|parr[oò]quial?|capella|basílica|monestir",
           "mas|masia|can|ca|cal|palau|seu|antiga|pairal|reial", sep="|"), nou)
   nou <- gsub("v", "b", nou) 
   nou <- gsub("ch", "c", nou) 
@@ -473,8 +473,17 @@ quick <- function(quadre) {
   return (instr)
 }
 
+#esglésies
+crear <- quedenng[grep("sant",quedenng$nomrel),]
+crear <- crear[!grepl("^(casa|ca[ln]|torre|borda|mas|granja|molí|cabana|caseta) ",crear$nomrel),]
+leafng <- crear
+leafwd <- lloctipus[grep("sant",lloctipus$nomrel),]
+leafwd <- leafwd[!grepl("^(casa|ca[ln]|torre|borda|mas|granja|molí|cabana|caseta) ",leafwd$nomrel),]
+leafwd <- leafwd[!duplicated(leafwd$item),]
+
+
 #per comarca
-comarca <- "BPE"
+comarca <- "BAG"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -484,8 +493,8 @@ leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
 
 #per municipi
-municipi = "Calafell"
-#municipi <- c("Guixers","la Coma i la Pedra")
+municipi = "Navars"
+#municipi <- c("Sant Jaume dels Domenys","la Bisbal del Penedès")
 leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -529,7 +538,7 @@ crear[is.na(crear$qtipus),]
 
 # Exclou fora del rectangle i un marge
 dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
-           crear$lat>min(leafwd$lat, na.rm=TRUE)-5*360/40000 &
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-.5*360/40000 &
            crear$lon<max(leafwd$lon, na.rm=TRUE)+3*360/40000 &
            crear$lon>min(leafwd$lon, na.rm=TRUE)-2.5*360/40000)
 table(dins)
@@ -611,7 +620,7 @@ repewd <- lloctipus[repetits(lloctipus[c("nomrel", "idescat")]),]
 #table(duplicated(repewd$item))
 repewd <- repewd[!duplicated(repewd$item),]
 repewd <- repewd[repetits(repewd[c("nomrel", "idescat")]),]
-repewd <- repewd[order(repewd$nomrel),]
+repewd <- repewd[order(repewd$nomrel, repewd$item),]
 
 qplant <- function(qurl) {
   q <- gsub("http://www.wikidata.org/entity/Q", "", qurl)
