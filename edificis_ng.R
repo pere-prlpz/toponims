@@ -175,8 +175,11 @@ lloctipus <- lloctipus[nchar(lloctipus$idescat)>2,] # això potser s'hauria d'ha
 if (file.exists("~/DADES/pere/varis/ngcatv10cs0f1r011.txt")) {
   ngcatv10cs0f1r011 <- read.csv("~/DADES/pere/varis/ngcatv10cs0f1r011.txt", 
                                 sep=";", colClasses = "character")
-} else {
+} else if (file.exists("~/pere/diversos/ngcatv10cs0f1r011.txt")) {
   ngcatv10cs0f1r011 <- read.csv("~/pere/diversos/ngcatv10cs0f1r011.txt", 
+                                sep=";", colClasses = "character")
+} else {
+  ngcatv10cs0f1r011 <- read.csv("~/varis/ngcatv10cs0f1r011.txt", 
                                 sep=";", colClasses = "character")
 }
 ngcatv10cs0f1r011$UTMX_ETRS89 <- as.numeric(ngcatv10cs0f1r011$UTMX_ETRS89)
@@ -483,7 +486,7 @@ leafwd <- leafwd[!duplicated(leafwd$item),]
 
 
 #per comarca
-comarca <- "BAG"
+comarca <- "OSO"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -493,8 +496,9 @@ leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
 
 #per municipi
-municipi = "Navars"
-#municipi <- c("Sant Jaume dels Domenys","la Bisbal del Penedès")
+municipi = "Lluçà"
+#municipi <- idescat$llocLabel[grepl("Voltregà",idescat$llocLabel)]
+#municipi <- c("les Masies de Voltregà","Alpens")
 leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -538,9 +542,9 @@ crear[is.na(crear$qtipus),]
 
 # Exclou fora del rectangle i un marge
 dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
-           crear$lat>min(leafwd$lat, na.rm=TRUE)-.5*360/40000 &
-           crear$lon<max(leafwd$lon, na.rm=TRUE)+3*360/40000 &
-           crear$lon>min(leafwd$lon, na.rm=TRUE)-2.5*360/40000)
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-1.9*360/40000 &
+           crear$lon<max(leafwd$lon, na.rm=TRUE)+.8*360/40000 &
+           crear$lon>min(leafwd$lon, na.rm=TRUE)-.8*360/40000)
 table(dins)
 crear <- crear[dins,]
 leafng <- leafng[leafng$id %in% crear$id,]
@@ -553,6 +557,7 @@ instruccions <- unlist(lapply(idmons, function(i) {quick(crear[crear$id==i,])}))
 cat(paste(instruccions, collapse="\n")) #pantalla
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/varis/instruccions.txt")
 
 if (!exists("recents")) {recents <- c()}
 recents <- c(recents, crear$id)
