@@ -64,7 +64,10 @@ crear$nomnou <- crear$nopar
 
 crear$nomnou <- 
   gsub("^([Hh]abitatge|[Cc]asa) (a|de)(l | la | l'|ls | les )([Cc]arrer|[Pp]laça|[Pp]asseig|muralla|riba|[Rr]iera|avinguda|[Cc]arretera|travess(i|er)a|[Rr]ambla|baixada|Força|barri|placeta|esplanada|Gran Via|[Vv]ia|riba|[Cc]amí|[Rr]onda)", 
-     "House in \\4", crear$nomnou)
+       "House in \\4", crear$nomnou)
+crear$nomnou <- 
+  gsub("^([Hh]abitatges|[Cc]ases) (a|de)(l | la | l'|ls | les )([Cc]arrer|[Pp]laça|[Pp]asseig|muralla|riba|[Rr]iera|avinguda|[Cc]arretera|travess(i|er)a|[Rr]ambla|baixada|Força|barri|placeta|esplanada|Gran Via|[Vv]ia|riba|[Cc]amí|[Rr]onda)", 
+       "Houses in \\4", crear$nomnou)
 crear$nomnou <- 
   gsub("^([Ee]difici|[Ee]difici d'habitatges) (a|de)(l | la | l'|ls | les )([Cc]arrer|[Pp]laça|[Pp]asseig|muralla|riba|[Rr]iera|avinguda|[Cc]arretera|travess(i|er)a|[Rr]ambla|baixada|Força|barri|placeta|esplanada|Gran Via|[Vv]ia|riba|[Cc]amí|[Rr]onda)", 
                      "Building in \\4", crear$nomnou)
@@ -79,6 +82,8 @@ crear$nomnou <- gsub("^[Ee]stació d(els? .*)$",
                      "\\1 station", crear$nomnou)
 crear$nomnou <- gsub("^[Ee]stació d(e |')(.*)$", 
                      "\\2 station", crear$nomnou)
+crear$nomnou <- gsub("^Assassinat de ", 
+                     "Murder of ", crear$nomnou)
 
 firstup <- function(x) {
   substr(x, 1, 1) <- toupper(substr(x, 1, 1))
