@@ -46,7 +46,10 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
 
 #vegueries <- c("Q18265", "Q249461", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384")
 #comamb <- c("Q12600", "Q13948", "Q14303", "Q15348", "Q15351")
-partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", "Q1462520", "Q1849804", "Q579384",
+partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", 
+             #"Q1462520",#ponent
+             "Q12732","Q12726","Q12728","Q12733","Q12727","Q12729",
+             "Q1849804", "Q579384",
              "Q12600", "Q13948", "Q14303", "Q15348", "Q15351","Q15352") 
 
 # baixa tots els elements d'un lloc de Catalunya
@@ -102,6 +105,9 @@ bd:serviceParam wikibase:language 'ca,oc,en,es,pl,sv,ceb'.
 
 totcat <- rbind(totcat, monuments)
 totcat <- totcat[!duplicated(totcat),]
+
+# trec fosses comunes, que no surten al fitxer de noms geogràfics
+totcat <- totcat[-grep("^Fossa comuna:", totcat$itemLabel),]
 
 classeswd <- getquery('SELECT DISTINCT ?tipus ?nomtipus
 WHERE {
@@ -447,10 +453,10 @@ quick <- function(quadre) {
   instr <- afegeix(instr,c("LAST", "Dca", 
                            cometes(paste0(fila$dconc, " ",
                                           de(fila$llocLabel)))))  
-  instr <- afegeix(instr, c("LAST", "P31", fila$iconc, "S248", "Q98463667"))  
   if (!is.na(fila$qtipus)) {
     instr <- afegeix(instr, c("LAST", "P31", fila$qtipus, "S248", "Q98463667"))
   }
+  instr <- afegeix(instr, c("LAST", "P31", fila$iconc, "S248", "Q98463667"))  
   instr <- afegeix(instr, c("LAST", "P131", fila$lloc, "S248", "Q98463667"))  
   instr <- afegeix(instr, c("LAST", "P625", 
                             paste0("@", fila$lat,"/", fila$lon),
@@ -486,7 +492,7 @@ leafwd <- leafwd[!duplicated(leafwd$item),]
 
 
 #per comarca
-comarca <- "OSO"
+comarca <- "BEB"
 leafmun <- unique(ngcatv10cs0f1r011$CodiMun1[
   ngcatv10cs0f1r011$CodiCom1==comarca & 
     ngcatv10cs0f1r011$Concepte %in% c("cap", "mun.")])
@@ -496,9 +502,9 @@ leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
 
 #per municipi
-municipi = "Lluçà"
-#municipi <- idescat$llocLabel[grepl("Voltregà",idescat$llocLabel)]
-#municipi <- c("les Masies de Voltregà","Alpens")
+municipi <- "Mas de Barberans"
+#municipi <- idescat$llocLabel[grepl("(Artesa|Puigverd) de Lleida",idescat$llocLabel)]
+#municipi <- c("Marçà","els Guiamets","Capçanes")
 leafmun <- idescat$idescat[idescat$llocLabel %in% municipi]
 leafwd <- lloctipus[lloctipus$idescat %in% leafmun,]
 leafwd <- leafwd[!duplicated(leafwd$item),]
@@ -532,7 +538,7 @@ crear[crear$qtipus=="Q585956",c("dconc","dconcen")] <- "masia"
 if (!exists("recents")) {recents <- c()}
 table(crear$id %in% recents)
 crear <- crear[!crear$id %in% recents,]
-crear<- crear[order(crear$Toponim),]
+crear<- crear[order(crear$Toponim,crear$lat),]
 
 crear$Toponim
 #crear <- crear[-c(14),] #per eliminar els que sobrin
@@ -541,10 +547,10 @@ table(is.na(crear$qtipus))
 crear[is.na(crear$qtipus),]
 
 # Exclou fora del rectangle i un marge
-dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+.5*360/40000 &
-           crear$lat>min(leafwd$lat, na.rm=TRUE)-1.9*360/40000 &
-           crear$lon<max(leafwd$lon, na.rm=TRUE)+.8*360/40000 &
-           crear$lon>min(leafwd$lon, na.rm=TRUE)-.8*360/40000)
+dins <- (crear$lat<max(leafwd$lat, na.rm=TRUE)+1.5*360/40000 &
+           crear$lat>min(leafwd$lat, na.rm=TRUE)-1.5*360/40000 &
+           crear$lon<max(leafwd$lon, na.rm=TRUE)+1.5*360/40000 &
+           crear$lon>min(leafwd$lon, na.rm=TRUE)-1.5*360/40000)
 table(dins)
 crear <- crear[dins,]
 leafng <- leafng[leafng$id %in% crear$id,]
@@ -554,9 +560,9 @@ idmons <- unique(crear$id)
 instruccions <- unlist(lapply(idmons, function(i) {quick(crear[crear$id==i,])})) 
 
 # sortides per triar
-cat(paste(instruccions, collapse="\n")) #pantalla
-cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
-cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
+#cat(paste(instruccions, collapse="\n")) #pantalla
+#cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+#cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
 cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/varis/instruccions.txt")
 
 if (!exists("recents")) {recents <- c()}
