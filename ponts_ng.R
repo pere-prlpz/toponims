@@ -73,6 +73,20 @@ resta <- totcat[nchar(totcat$idescat)<=2,]
 table(resta$item %in% lloctipus$item)
 resta[!resta$item %in% lloctipus$item,]
 
+# alias
+alies <- getquery("SELECT DISTINCT ?item ?alias
+WHERE {
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P131* wd:Q5705.
+  ?item skos:altLabel ?alias.
+}") 
+aliesedif <- merge(lloctipus, alies, by="item")
+aliesedif$itemLabel <- aliesedif$alias
+aliesedif$alias <- NULL
+aliesedif <- aliesedif[!duplicated(aliesedif),]
+lloctipus <- rbind(lloctipus, aliesedif)
+lloctipus <- lloctipus[!duplicated(lloctipus),]
+
 # treiem paràmetres dels noms
 treupar <- function(nom) {
   trossos <- strsplit(nom," (", fixed = TRUE)
@@ -81,7 +95,7 @@ treupar <- function(nom) {
 
 # treu el/la
 treuart <- function(nom) {
-  gsub("^(el|la|els|les) ","",nom)
+  nom <- gsub("^(el|la|els|les|lo) ","",nom)
   gsub("^l'","",nom)
 }
 
@@ -109,8 +123,8 @@ nomred <- ngcatv10cs0f1r011
 
 
 # només ponts:
-nomred$Toponim[nomred$CodiGeo==30509]
-nomred$Toponim[nomred$CodiGeo==40411]
+#nomred$Toponim[nomred$CodiGeo==30509]
+#nomred$Toponim[nomred$CodiGeo==40411]
 
 nomred <- nomred[nomred$CodiGeo==30509 | 
                    (nomred$CodiGeo==40411 & 
@@ -141,7 +155,8 @@ for (varmun in varmuns) {
 # i tots els ponts del fitxer de noms geogràfics (nomid)
 # Els preparem per unir-los.
 
-nomid$nomrel <- treuart(tolower(nomid$Toponim))
+nomid$nomrel <- sapply(nomid$Toponim, treupar)
+nomid$nomrel <- treuart(tolower(nomid$nomrel))
 
 #1- unim per nom i municipi
 units <- merge(lloctipus, nomid, by=c("nomrel","idescat"))
@@ -194,5 +209,81 @@ m <- addRectangles(m, lng1=min(leafwd$lon, na.rm=TRUE),
                    lat2=max(leafwd$lat, na.rm=TRUE),
                    fill=FALSE, color="red")
 m
+
+##################################################################
+# Carregar
+##############################################################
+
+#afegir "de"
+de <- function(nom) {
+  if (grepl("^els? ", nom)) {
+    denom <- paste0("d",nom)
+  } else {
+    if (grepl("^[AEIOUÀÈÉÍÒÓÚ]", nom)) {
+      denom <- paste0("d'",nom)
+    } else {
+      denom <- paste0("de ",nom)
+    }
+  }
+  return(denom)
+}
+
+# afegir cometes
+cometes <- function(text) {
+  paste0('"',text,'"')
+}
+
+# funció per preparar quickstatements
+afegeix <- function(llista, vector) {
+  llista[[1+length(llista)]] <- vector
+  return(llista)
+}
+
+# preparar crear
+
+crear <- merge(crear, idescat, all.x=TRUE)
+
+# preparar quickstatemens
+quick <- function(quadre) {
+  fila <- quadre[1,]
+  instr <- list(c("CREATE"))
+  instr <- afegeix(instr,c("LAST", "Lca", cometes(fila$Toponim)))  
+  instr <- afegeix(instr,c("LAST", "Dca", 
+                           cometes(paste("pont",
+                                          de(fila$llocLabel)))))  
+  instr <- afegeix(instr, c("LAST", "P31", "Q12280", "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P131", fila$lloc, "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P625", 
+                            paste0("@", fila$lat,"/", fila$lon),
+                            "S248", "Q98463667"))  
+  instr <- afegeix(instr, c("LAST", "P17", "Q29"))  
+  instr <- afegeix(instr, c("LAST", "Len", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Loc", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Leu", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lfr", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lpt", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Lde", cometes(fila$Toponim)))  
+  instr <- afegeix(instr, c("LAST", "Den", 
+                            paste0('"bridge in ', fila$llocLabel,
+                                   " (Catalonia)",'"')))  
+  if (nrow(quadre)>1) {
+    for (i in 2:nrow(quadre)) {
+      instr <- afegeix(instr, c("LAST", "P131", quadre[i,]$lloc, 
+                                "S248", "Q98463667"))
+    }
+  }
+  instr <- sapply(instr, FUN=paste, collapse="\t")
+  return (instr)
+}
+
+# preparar instruccions
+idmons <- unique(crear$id)
+instruccions <- unlist(lapply(idmons, function(i) {quick(crear[crear$id==i,])})) 
+
+# sortides per triar
+#cat(paste(instruccions, collapse="\n")) #pantalla
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+#cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/pere/diversos/instruccions.txt")
+
 
 
