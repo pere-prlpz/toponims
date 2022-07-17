@@ -1,4 +1,5 @@
 ## codis municipis
+# alternativament, load més avalla
 
 library(httr)
 library(rjson)
@@ -51,6 +52,7 @@ WHERE {
 
 save(idescat, file="~\\DADES\\pere\\varis/idescat.RData")
 
+## Per carregar municipis si ja existeixen
 #load(file="~\\DADES\\pere\\varis/idescat.RData", verbose=TRUE)
 
 ## llegir pàgina mapa parimoni culturlal
@@ -87,15 +89,22 @@ llegeix <- function(url) {
   caracs <- c("height", "latitude", "longitude")
   lcaracs <- lapply(caracs, treucarac, pag)
   names(lcaracs) <- caracs
-  resultat <- c(list(nom=nom, municipi=mun, qmun=qmun),lcaracs)
+  iest <- grep('<div class="field__label">Estat de conservació</div>', pag)
+  cons <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
+  estcons <- c("Bo"="Q56557591")
+  qcons <- estcons[cons]
+  if (is.na(qcons)) {
+    print(paste("Estat de conservació desconegut:", cons))
+  }
+  resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),lcaracs)
   return(resultat)
 }
 
-url <- "https://patrimonicultural.diba.cat/element/pont-del-cami-de-molnell-a-la-muga-per-vimboca"
+#url <- "https://patrimonicultural.diba.cat/element/pont-del-cami-de-molnell-a-la-muga-per-vimboca"
 
-dades <- llegeix(url)
+#dades <- llegeix(url)
 
-dades$qmun <- idescat$lloc[idescat$llocLabel==dades$municipi]
+#dades$qmun <- idescat$lloc[idescat$llocLabel==dades$municipi]
 
 ##################################################################
 # Carregar
@@ -138,25 +147,30 @@ quick <- function(dades, url) {
                             paste('"bridge in', dades$municipi,
                                    '(Catalonia)"')))  
   if (grepl("pont|viaducte|passera", tolower(dades$nom))) {
-    instr <- afegeix(instr, c("LAST", "P31", "Q12280", "S854", curl))  
+    instr <- afegeix(instr, c("LAST", "P31", "Q12280", 
+                              "S248", "Q9028374", "S854", curl))  
   }
   instr <- afegeix(instr, c("LAST", "P131", dades$qmun, "S854", curl))  
   instr <- afegeix(instr, c("LAST", "P625", 
                             paste0("@", dades$latitude,"/", dades$longitude),
-                            "S854", curl))  
+                            "S248", "Q9028374", "S854", curl))  
   instr <- afegeix(instr, c("LAST", "P17", "Q29")) 
   if (!is.na(dades$height)) {
     instr <- afegeix(instr, c("LAST", "P2044", paste0(dades$height, "U11573"), 
-                              "S854", curl))  
+                              "S248", "Q9028374", "S854", curl))  
+  }
+  if (!is.na(dades$qcons)) {
+    instr <- afegeix(instr, c("LAST", "P5816", dades$qcons, 
+                              "S248", "Q9028374", "S854", curl))  
   }
   return(instr)
 }
 
-quick(dades, url)
+#quick(dades, url)
 
-instruccions <- paste(unlist(quick(dades, url)), sep="\t", collapse="\n")
-cat(instruccions)
+#instruccions <- paste(unlist(quick(dades, url)), sep="\t", collapse="\n")
+#cat(instruccions)
 
-
-url <- "https://patrimonicultural.diba.cat/index.php/element/pont-de-can-pobla"
+# escriure aquí la url de la fitxa de patrimoni
+url <- "https://patrimonicultural.diba.cat/index.php/element/pont-de-la-roca-0"
 cat(enc2utf8(paste(unlist(quick(llegeix(url), url)), sep="\t", collapse="\n")))
