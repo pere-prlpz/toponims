@@ -1,5 +1,5 @@
 ## codis municipis
-# alternativament, load més avalla
+# alternativament, load més avall
 
 library(httr)
 library(rjson)
@@ -91,7 +91,7 @@ llegeix <- function(url) {
   names(lcaracs) <- caracs
   iest <- grep('<div class="field__label">Estat de conservació</div>', pag)
   cons <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
-  estcons <- c("Bo"="Q56557591")
+  estcons <- c("Bo"="Q56557591", "Regular"="Q106379705")
   qcons <- estcons[cons]
   if (is.na(qcons)) {
     print(paste("Estat de conservació desconegut:", cons))
@@ -146,17 +146,23 @@ quick <- function(dades, url) {
   instr <- afegeix(instr, c("LAST", "Den", 
                             paste('"bridge in', dades$municipi,
                                    '(Catalonia)"')))  
-  if (grepl("pont|viaducte|passera", tolower(dades$nom))) {
+  if (grepl("aqüeducte", tolower(dades$nom))) {
+    instr <- afegeix(instr, c("LAST", "P31", "Q18870689", 
+                              "S248", "Q9028374", "S854", curl))  
+  }
+  if (grepl("pont|viaducte|passera|aqüeducte", tolower(dades$nom))) {
     instr <- afegeix(instr, c("LAST", "P31", "Q12280", 
                               "S248", "Q9028374", "S854", curl))  
   }
-  instr <- afegeix(instr, c("LAST", "P131", dades$qmun, "S854", curl))  
+  instr <- afegeix(instr, c("LAST", "P131", dades$qmun, 
+                            "S248", "Q9028374", "S854", curl))  
   instr <- afegeix(instr, c("LAST", "P625", 
                             paste0("@", dades$latitude,"/", dades$longitude),
                             "S248", "Q9028374", "S854", curl))  
   instr <- afegeix(instr, c("LAST", "P17", "Q29")) 
   if (!is.na(dades$height)) {
-    instr <- afegeix(instr, c("LAST", "P2044", paste0(dades$height, "U11573"), 
+    instr <- afegeix(instr, c("LAST", "P2044", 
+                              paste0(gsub(" ?m$","",dades$height), "U11573"), 
                               "S248", "Q9028374", "S854", curl))  
   }
   if (!is.na(dades$qcons)) {
@@ -172,5 +178,5 @@ quick <- function(dades, url) {
 #cat(instruccions)
 
 # escriure aquí la url de la fitxa de patrimoni
-url <- "https://patrimonicultural.diba.cat/index.php/element/pont-de-la-roca-0"
+url <- "https://patrimonicultural.diba.cat/element/aqueducte-de-can-nyac"
 cat(enc2utf8(paste(unlist(quick(llegeix(url), url)), sep="\t", collapse="\n")))
