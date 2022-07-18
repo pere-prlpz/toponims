@@ -135,38 +135,53 @@ afegeix <- function(llista, vector) {
   return(llista)
 }
 
-quick <- function(dades, url) {
+quick <- function(dades, url, qid="LAST") {
   curl <- cometes(url)
-  instr <- list(c("CREATE"))
-  instr <- afegeix(instr,c("LAST", "Lca", cometes(dades$nom)))  
-  instr <- afegeix(instr,c("LAST", "Dca", 
-                           cometes(paste("pont",
-                                         de(dades$municipi)))))
-  instr <- afegeix(instr, c("LAST", "Len", cometes(dades$nom)))  
-  instr <- afegeix(instr, c("LAST", "Den", 
-                            paste('"bridge in', dades$municipi,
-                                   '(Catalonia)"')))  
+  if (qid=="LAST") {
+    instr <- list(c("CREATE"))
+    Lca <- "Lca"
+    Len <- "Len"
+  } else {
+    instr <- list()
+    Lca <- "Aca"
+    Len <- "Aen"
+  }
   if (grepl("aqüeducte", tolower(dades$nom))) {
-    instr <- afegeix(instr, c("LAST", "P31", "Q18870689", 
+    instr <- afegeix(instr, c(qid, "P31", "Q18870689", 
                               "S248", "Q9028374", "S854", curl))  
   }
   if (grepl("pont|viaducte|passera|aqüeducte", tolower(dades$nom))) {
-    instr <- afegeix(instr, c("LAST", "P31", "Q12280", 
-                              "S248", "Q9028374", "S854", curl))  
+    instr <- afegeix(instr, c(qid, "P31", "Q12280", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <-  c("ca"="pont", "en"="bridge")
   }
-  instr <- afegeix(instr, c("LAST", "P131", dades$qmun, 
+  if (grepl("font", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q483453", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="font", "en"="fountain")
+  }
+  instr <- afegeix(instr,c(qid, Lca, cometes(dades$nom)))  
+  instr <- afegeix(instr,c(qid, "Dca", 
+                           cometes(paste(terme["ca"],
+                                         de(dades$municipi)))))
+  instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))  
+  instr <- afegeix(instr, c(qid, "Den", 
+                            cometes(paste(terme["en"], 'in', 
+                                          dades$municipi,
+                                          '(Catalonia)'))))
+  instr <- afegeix(instr, c(qid, "P131", dades$qmun, 
                             "S248", "Q9028374", "S854", curl))  
-  instr <- afegeix(instr, c("LAST", "P625", 
+  instr <- afegeix(instr, c(qid, "P625", 
                             paste0("@", dades$latitude,"/", dades$longitude),
                             "S248", "Q9028374", "S854", curl))  
-  instr <- afegeix(instr, c("LAST", "P17", "Q29")) 
+  instr <- afegeix(instr, c(qid, "P17", "Q29")) 
   if (!is.na(dades$height)) {
-    instr <- afegeix(instr, c("LAST", "P2044", 
+    instr <- afegeix(instr, c(qid, "P2044", 
                               paste0(gsub(" ?m$","",dades$height), "U11573"), 
                               "S248", "Q9028374", "S854", curl))  
   }
   if (!is.na(dades$qcons)) {
-    instr <- afegeix(instr, c("LAST", "P5816", dades$qcons, 
+    instr <- afegeix(instr, c(qid, "P5816", dades$qcons, 
                               "S248", "Q9028374", "S854", curl))  
   }
   return(instr)
@@ -178,5 +193,15 @@ quick <- function(dades, url) {
 #cat(instruccions)
 
 # escriure aquí la url de la fitxa de patrimoni
-url <- "https://patrimonicultural.diba.cat/element/aqueducte-de-can-nyac"
-cat(enc2utf8(paste(unlist(quick(llegeix(url), url)), sep="\t", collapse="\n")))
+#qid <- "LAST"
+#qid <- "Q81756141"
+#url <- "https://patrimonicultural.diba.cat/element/pont-de-la-barquera"
+#cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid)), sep="\t", collapse="\n")))
+
+totinstr <- function(url, qid="LAST") {
+  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid)), sep="\t", collapse="\n")))
+}
+
+#totinstr("https://patrimonicultural.diba.cat/element/pont-de-can-rovira")
+
+totinstr(scan("clipboard", what="character"))
