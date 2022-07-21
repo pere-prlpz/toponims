@@ -43,17 +43,18 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
   return(getsparql(url, treuurl, coornum))
 }
 
-#codi municipi
-idescat <- getquery("SELECT ?lloc ?llocLabel ?idescat 
-WHERE {
+## Per carregar municipis si ja existeixen
+if (file.exists("~\\DADES\\pere\\varis/idescat.RData")) {
+  load(file="~\\DADES\\pere\\varis/idescat.RData", verbose=TRUE)
+} else {
+  idescat <- getquery("SELECT ?lloc ?llocLabel ?idescat 
+  WHERE {
   ?lloc wdt:P4335 ?idescat.
   SERVICE wikibase:label {bd:serviceParam wikibase:language 'ca' .}
-}")
+  }")
+  save(idescat, file="~\\DADES\\pere\\varis/idescat.RData")
+}
 
-save(idescat, file="~\\DADES\\pere\\varis/idescat.RData")
-
-## Per carregar municipis si ja existeixen
-#load(file="~\\DADES\\pere\\varis/idescat.RData", verbose=TRUE)
 
 ## llegir pàgina mapa parimoni culturlal
 
@@ -96,7 +97,22 @@ llegeix <- function(url) {
   if (is.na(qcons)) {
     print(paste("Estat de conservació desconegut:", cons))
   }
-  resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),lcaracs)
+  iest <- grep('<div class="field__label">Any</div>', pag)
+  if (length(iest)==1) {
+    any <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
+    segle <- NA
+  } else {
+    any <- NA
+    iest <- grep('<div class="field__label">Segle</div>', pag)
+    if (length(iest)==1) {
+      segle <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
+    } else {
+      segle <- NA
+    }
+  }
+  resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),
+                lcaracs,
+                any=any, segle=segle)
   return(resultat)
 }
 
@@ -135,7 +151,27 @@ afegeix <- function(llista, vector) {
   return(llista)
 }
 
-quick <- function(dades, url, qid="LAST", altres=c("")) {
+datas <- function(any=NA, segle=NA) {
+  if (!is.na(any)) {
+    return(paste0("+",any,"-00-00T00:00:00Z/9"))
+  } else if (!is.na(segle)) {
+    inicial <- (0:20)*100+1
+    names(inicial) <- c("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", 
+                        "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", 
+                        "XX", "XXI")
+    inici <- inicial[segle]
+    if (!is.na(inici)) {
+      return(paste0("+",inici,"-00-00T00:00:00Z/7"))
+    } else {
+      return(NA)
+    }
+  } else {
+    return(NA)
+  }
+}
+
+
+quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
   curl <- cometes(url)
   if (qid=="LAST") {
     instr <- list(c("CREATE"))
@@ -160,15 +196,17 @@ quick <- function(dades, url, qid="LAST", altres=c("")) {
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="font", "en"="fountain")
   }
-  instr <- afegeix(instr,c(qid, Lca, cometes(dades$nom)))  
-  instr <- afegeix(instr,c(qid, "Dca", 
-                           cometes(paste(terme["ca"],
-                                         de(dades$municipi)))))
+  instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
   instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))  
-  instr <- afegeix(instr, c(qid, "Den", 
-                            cometes(paste(terme["en"], 'in', 
-                                          dades$municipi,
-                                          '(Catalonia)'))))
+  if (descr) {
+    instr <- afegeix(instr,c(qid, "Dca", 
+                             cometes(paste(terme["ca"],
+                                           de(dades$municipi)))))
+    instr <- afegeix(instr, c(qid, "Den", 
+                              cometes(paste(terme["en"], 'in', 
+                                            dades$municipi,
+                                            '(Catalonia)'))))
+  }
   instr <- afegeix(instr, c(qid, "P131", dades$qmun, 
                             "S248", "Q9028374", "S854", curl))  
   instr <- afegeix(instr, c(qid, "P625", 
@@ -204,6 +242,12 @@ quick <- function(dades, url, qid="LAST", altres=c("")) {
                               altres["ulls"], 
                               "S248", "Q9028374", "S854", curl))  
   }
+  dcrea <- datas(dades$any, dades$segle)
+  if (!is.na(dcrea)) {
+    instr <- afegeix(instr, c(qid, "P571", 
+                              dcrea, 
+                              "S248", "Q9028374", "S854", curl))  
+  }
   return(instr)
 }
 
@@ -218,15 +262,23 @@ quick <- function(dades, url, qid="LAST", altres=c("")) {
 #url <- "https://patrimonicultural.diba.cat/element/pont-de-la-barquera"
 #cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid)), sep="\t", collapse="\n")))
 
-totinstr <- function(url, qid="LAST", altres=c("")) {
-  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid, altres)), sep="\t", collapse="\n")))
+totinstr <- function(url, qid="LAST", altres=c(""), descr=TRUE) {
+  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid, altres, descr)), sep="\t", collapse="\n")))
 }
 
 #totinstr("https://patrimonicultural.diba.cat/element/pont-de-can-rovira")
 
-#totinstr(scan("clipboard", what="character"), qid="Q20108694")
+# afegir dades a un element existent
+#totinstr(scan("clipboard", what="character"), qid="Q84321856", descr=FALSE)
 
+# element nou (url agafada del portapapers)
 totinstr(scan("clipboard", what="character"))
 
+# element nou, amb llum i altres paràmetres introduïts a mà
 #altres <- c(ulls=1, ample=5, llarg=20)#,llum=)
 #totinstr(scan("clipboard", what="character"), altres=altres)
+#totinstr(scan("clipboard", what="character"), altres=c(ulls=1)) #alternatiu
+
+# element existents, amb llum i altres paràmetres introduïts a mà
+#altres <- c(ulls=1)#, ample=5, llarg=20)#,llum=)
+#totinstr(scan("clipboard", what="character"), altres=altres, qid="Q110641543", descr=FALSE)
