@@ -135,7 +135,7 @@ afegeix <- function(llista, vector) {
   return(llista)
 }
 
-quick <- function(dades, url, qid="LAST") {
+quick <- function(dades, url, qid="LAST", altres=c("")) {
   curl <- cometes(url)
   if (qid=="LAST") {
     instr <- list(c("CREATE"))
@@ -184,6 +184,26 @@ quick <- function(dades, url, qid="LAST") {
     instr <- afegeix(instr, c(qid, "P5816", dades$qcons, 
                               "S248", "Q9028374", "S854", curl))  
   }
+  if (!is.na(altres["llum"])) {
+    instr <- afegeix(instr, c(qid, "P2787", 
+                              paste0(gsub(" ?m$","",altres["llum"]), "U11573"), 
+                              "S248", "Q9028374", "S854", curl))  
+  }
+  if (!is.na(altres["llarg"])) {
+    instr <- afegeix(instr, c(qid, "P2043", 
+                              paste0(gsub(" ?m$","",altres["llarg"]), "U11573"), 
+                              "S248", "Q9028374", "S854", curl))  
+  }
+  if (!is.na(altres["ample"])) {
+    instr <- afegeix(instr, c(qid, "P2049", 
+                              paste0(gsub(" ?m$","",altres["ample"]), "U11573"), 
+                              "S248", "Q9028374", "S854", curl))  
+  }
+  if (!is.na(altres["ulls"])) {
+    instr <- afegeix(instr, c(qid, "P1314", 
+                              altres["ulls"], 
+                              "S248", "Q9028374", "S854", curl))  
+  }
   return(instr)
 }
 
@@ -198,10 +218,15 @@ quick <- function(dades, url, qid="LAST") {
 #url <- "https://patrimonicultural.diba.cat/element/pont-de-la-barquera"
 #cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid)), sep="\t", collapse="\n")))
 
-totinstr <- function(url, qid="LAST") {
-  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid)), sep="\t", collapse="\n")))
+totinstr <- function(url, qid="LAST", altres=c("")) {
+  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid, altres)), sep="\t", collapse="\n")))
 }
 
 #totinstr("https://patrimonicultural.diba.cat/element/pont-de-can-rovira")
 
+#totinstr(scan("clipboard", what="character"), qid="Q20108694")
+
 totinstr(scan("clipboard", what="character"))
+
+#altres <- c(ulls=1, ample=5, llarg=20)#,llum=)
+#totinstr(scan("clipboard", what="character"), altres=altres)
