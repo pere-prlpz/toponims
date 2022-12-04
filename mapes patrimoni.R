@@ -44,19 +44,19 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
 }
 
 ## Per carregar municipis si ja existeixen
-if (file.exists("~\\DADES\\pere\\varis/idescat.RData")) {
-  load(file="~\\DADES\\pere\\varis/idescat.RData", verbose=TRUE)
+if (file.exists("~\\varis/idescat.RData")) { # PER FER: path adaptable
+  load(file="~\\varis/idescat.RData", verbose=TRUE)
 } else {
   idescat <- getquery("SELECT ?lloc ?llocLabel ?idescat 
   WHERE {
   ?lloc wdt:P4335 ?idescat.
   SERVICE wikibase:label {bd:serviceParam wikibase:language 'ca' .}
   }")
-  save(idescat, file="~\\DADES\\pere\\varis/idescat.RData")
+  save(idescat, file="~\\varis/idescat.RData")
 }
 
 
-## llegir pàgina mapa parimoni culturlal
+## llegir pàgina mapa patrimoni culturlal
 
 library(stringr)
 
@@ -86,6 +86,7 @@ llegeix <- function(url) {
   mun <- pag[grepl('<a href=".*/municipi/.*">.*</a>', pag)]
   mun <- gsub('<a href=".*/municipi/.*">(.*)</a>', "\\1", mun)
   mun <- unescape_html((str_trim(mun)))
+  nom <- gsub(paste0("\\. ",mun), "", nom)
   qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(mun)]
   caracs <- c("height", "latitude", "longitude")
   lcaracs <- lapply(caracs, treucarac, pag)
@@ -153,6 +154,7 @@ afegeix <- function(llista, vector) {
 
 datas <- function(any=NA, segle=NA) {
   if (!is.na(any)) {
+    any <- gsub("^c. ", "", any)
     return(paste0("+",any,"-00-00T00:00:00Z/9"))
   } else if (!is.na(segle)) {
     inicial <- (0:20)*100+1
@@ -190,11 +192,14 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q12280", 
                               "S248", "Q9028374", "S854", curl))
     terme <-  c("ca"="pont", "en"="bridge")
-  }
-  if (grepl("font", tolower(dades$nom))) {
+  } else if (grepl("font", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q483453", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="font", "en"="fountain")
+  } else if (grepl("^(casa |can |ca n'|cal |ca l'|cases |habitatge )", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q3947", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="casa", "en"="house")
   }
   instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
   instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))  
