@@ -52,7 +52,14 @@ if (file.exists("~\\varis/idescat.RData")) { # PER FER: path adaptable
   ?lloc wdt:P4335 ?idescat.
   SERVICE wikibase:label {bd:serviceParam wikibase:language 'ca' .}
   }")
-  save(idescat, file="~\\varis/idescat.RData")
+  idescatAlias <- getquery('SELECT ?lloc ?llocLabel ?idescat ?alias
+  WHERE {
+  ?lloc wdt:P4335 ?idescat.
+  ?lloc skos:altLabel ?alias.
+  FILTER(LANG(?alias) = "ca").
+  SERVICE wikibase:label {bd:serviceParam wikibase:language "ca".}
+  }')
+  save(idescat, idescatAlias, file="~\\varis/idescat.RData")
 }
 
 
@@ -70,6 +77,7 @@ treucarac <- function(carac, pag) {
   dada <- pag[i0:i1]
   dada <- dada[grep('<div class="patrimonial-element__item">', dada)]
   dada <- gsub('^.*<div class="patrimonial-element__item">(.*)</div>.*$', "\\1", dada)
+  dada <- gsub(",",".",dada)
   return(dada)  
 }
 
@@ -88,9 +96,18 @@ llegeix <- function(url) {
   mun <- unescape_html((str_trim(mun)))
   nom <- gsub(paste0("\\. ",mun), "", nom)
   qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(mun)]
+  if (length(qmun)==0) {
+    qmun <- idescatAlias$lloc[tolower(idescatAlias$alias)==tolower(mun)]
+    if (length(qmun)==1) {
+      mun <- idescat$llocLabel[idescat$lloc==qmun]
+    }
+  }
   caracs <- c("height", "latitude", "longitude")
   lcaracs <- lapply(caracs, treucarac, pag)
   names(lcaracs) <- caracs
+  itipologia <- grep('<div class="field__label">Tipologia</div>', pag)
+  tipologia <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[itipologia+1])
+  tipologia <- str_trim(gsub('^.*<div class="field__item">', "", tipologia))
   iest <- grep('<div class="field__label">Estat de conservació</div>', pag)
   cons <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
   estcons <- c("Bo"="Q56557591", "Regular"="Q106379705")
@@ -100,7 +117,8 @@ llegeix <- function(url) {
   }
   iest <- grep('<div class="field__label">Any</div>', pag)
   if (length(iest)==1) {
-    any <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
+    any <- gsub('^.*<div class="field__item">(.*)(</div>)?.*$', "\\1", pag[iest+1])
+    any <- gsub('</div>', "", any)
     segle <- NA
   } else {
     any <- NA
@@ -113,7 +131,7 @@ llegeix <- function(url) {
   }
   resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),
                 lcaracs,
-                any=any, segle=segle)
+                any=any, segle=segle, tipologia=tipologia)
   return(resultat)
 }
 
@@ -138,6 +156,8 @@ de <- function(nom) {
       denom <- paste0("de ",nom)
     }
   }
+  denom <- gsub("^d'Els ", "dels ", denom)
+  denom <- gsub("^d'El ", "del ", denom)
   return(denom)
 }
 
@@ -155,7 +175,13 @@ afegeix <- function(llista, vector) {
 datas <- function(any=NA, segle=NA) {
   if (!is.na(any)) {
     any <- gsub("^c. ", "", any)
-    return(paste0("+",any,"-00-00T00:00:00Z/9"))
+    any <- gsub(" c.", "", any)
+    if (grepl("-",any)) {
+      any <- strsplit(any,"-")[[1]][1]
+      return(paste0("+",any,"-00-00T00:00:00Z/8"))
+    } else {
+      return(paste0("+",any,"-00-00T00:00:00Z/9"))
+    }
   } else if (!is.na(segle)) {
     inicial <- (0:20)*100+1
     names(inicial) <- c("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", 
@@ -187,8 +213,7 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
   if (grepl("aqüeducte", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q18870689", 
                               "S248", "Q9028374", "S854", curl))  
-  }
-  if (grepl("pont|viaducte|passera|aqüeducte", tolower(dades$nom))) {
+  } else if (grepl("pont|viaducte|passera|aqüeducte", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q12280", 
                               "S248", "Q9028374", "S854", curl))
     terme <-  c("ca"="pont", "en"="bridge")
@@ -200,6 +225,98 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q3947", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="casa", "en"="house")
+  } else if (grepl("^mas((over)?ia)? ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q585956", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="masia", "en"="masia")
+  } else if (grepl("^(cova|coves|gruta) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q35509", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="cova", "en"="cave")
+  } else if (grepl("^balm(a|es) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q35509", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="balma", "en"="rock shelter")
+  } else if (grepl("^barrac(a|es) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q2932238", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="barraca de vinya", "en"="dry stone hut")
+  } else if (grepl("^mol(í|ins) de vent", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q38720", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="molí de vent", "en"="windmill")
+  } else if (grepl("^mol(í|ins) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q185187", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="molí", "en"="mill")
+  } else if (grepl("^monuments? ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q4989906", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="monument", "en"="monument")
+  } else if (grepl("^min(a|es) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q820477", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="mina", "en"="mine")
+  } else if (grepl("^bass(a|es) ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q3253281", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="bassa", "en"="pond")
+  } else if (grepl("^gorg(a|ues)? ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q2385513", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="gorg", "en"="stream pond")
+  } else if (grepl("^resclosa ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q1066997", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="resclosa", "en"="weir")
+  } else if (grepl("^forns? de calç ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q59772", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="forn de calç", "en"="lime kiln")
+  } else if (grepl("^cementiri ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q39614", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="cementiri", "en"="cemetery")
+  } else if (grepl("^xemeneia ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q2962545", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="xemeneia", "en"="chimney")
+  } else if (grepl("^bòbila", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q198632", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="bòbila", "en"="brickworks")
+  } else if (grepl("^estació d'aforament", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q505774", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="estació d'aforament", "en"="stream gauge")
+  } else if (grepl("^rellotge de sol ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q80793", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="rellotge de sol", "en"="sundial")
+  } else if (grepl("^plaça", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q174782", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="plaça", "en"="square")
+  } else if (grepl("^sureres ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q5688661", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="sureda", "en"="cork oak woodland")
+  } else if(dades$tipologia=="Edifici") {
+    instr <- afegeix(instr, c(qid, "P31", "Q41176", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="edifici", "en"="building")
+  } else if(dades$tipologia=="Element urbà") {
+    instr <- afegeix(instr, c(qid, "P31", "Q13397636", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="element urbà", "en"="urban element")
+  } else if(dades$tipologia=="Conjunt arquitectònic") {
+    instr <- afegeix(instr, c(qid, "P31", "Q1497375", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="conjunt arquitectònic", "en"="architectural ensemble")
+  } else if(dades$tipologia=="Espècimen botànic") {
+    instr <- afegeix(instr, c(qid, "P31", "Q811534", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="arbre singular", "en"="remarkable tree")
   }
   instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
   instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))  
@@ -287,3 +404,83 @@ totinstr(scan("clipboard", what="character"))
 # element existents, amb llum i altres paràmetres introduïts a mà
 #altres <- c(ulls=1)#, ample=5, llarg=20)#,llum=)
 #totinstr(scan("clipboard", what="character"), altres=altres, qid="Q110641543", descr=FALSE)
+
+# element existent (url agafada del portapapers)
+totinstr(scan("clipboard", what="character"), qid="Q19256307")
+
+
+###############
+# mapa existents
+
+library(httr)
+library(rjson)
+
+treuvar <- function(var, bind) {
+  sapply(bind, function(x) (x[[var]]$value))
+}
+
+desllista <- function(x) {
+  x[sapply(x, is.null)] <- NA
+  return(unlist(x))
+}
+
+getsparql <- function(url, treuurl=TRUE, coornum=TRUE) {
+  cont <- fromJSON(rawToChar(content(GET(url))))
+  nomsvars <- cont$head$vars
+  llista <- lapply(nomsvars, treuvar, bind=cont$results$bindings)
+  names(llista) <- nomsvars
+  llista <- lapply(llista, desllista)
+  df <- as.data.frame(llista, stringsAsFactors = FALSE)
+  if (coornum) {
+    if ("lat" %in% colnames(df)) {
+      df$lat <- as.numeric(df$lat)
+    }
+    if ("lon" %in% colnames(df)) {
+      df$lon <- as.numeric(df$lon)
+    }
+  }
+  if (treuurl) {
+    for (var in names(df)) {
+      if (class(df[[var]])=="character") {
+        df[[var]] <- gsub("http://www.wikidata.org/entity/", "", df[[var]])
+      }
+    }
+  }
+  return(df)
+}
+
+getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
+  url <- paste0("https://query.wikidata.org/sparql?query=", URLencode(query))
+  return(getsparql(url, treuurl, coornum))
+}
+
+
+consultacoord <- function(lat, long, dist=2) {
+  paste0("SELECT ?item ?itemLabel ?inst ?instLabel ?coord WHERE {
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P625 ?coord.
+  OPTIONAL {
+      ?item wdt:P31 ?inst.
+  }
+  FILTER(geof:distance(?coord, 'Point(",lat," ",long,")'^^geo:wktLiteral) < ",dist,"). 
+  SERVICE wikibase:label {
+    bd:serviceParam wikibase:language '[AUTO_LANGUAGE],ca,en,es,fr,de' . 
+  }
+}")
+}
+
+trobapropers <- function(lat, long, dist=2) {
+  prop <- getquery(consultacoord(lat, long, dist))
+  coortxt <- gsub("Point\\(|\\)","", prop$coord)
+  coortxt <- strsplit(coortxt, " ")
+  coortxt <- lapply(coortxt, as.numeric)
+  coor <- do.call(rbind, coortxt)
+  colnames(coor) <- c("lat", "lon")
+  cbind(prop, coor)
+}
+
+
+
+distancia <- function(lat1,lon1,lat2,lon2) {
+  sqrt((lat1-lat2)^2+((lon1-lon2)*cos((lat1+lat2)/2*pi/180))^2)/180*pi*6371
+}

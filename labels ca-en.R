@@ -110,6 +110,6 @@ quick <- function(fila) {
 }
 
 instruccions <- unlist(lapply(1:nrow(crear), function(i) {quick(crear[i,])})) #1:nrow(crear)
-cat(paste(instruccions, collapse="\n")) #pantalla
-cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/DADES/pere/varis/instruccions.txt")
+#cat(paste(instruccions, collapse="\n")) #pantalla
+cat(enc2utf8(paste(instruccions, collapse="\n")), file="~/varis/instruccions.txt")
 
