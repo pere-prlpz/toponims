@@ -106,6 +106,7 @@ llegeix <- function(url) {
   mun <- unescape_html((str_trim(mun)))
   nom <- gsub(paste0("\\. ",mun), "", nom)
   qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(mun)]
+  diumasia <- any(grepl("[Mm]as((over)?ia)?\\b",pag))
   if (length(qmun)==0) {
     qmun <- idescatAlias$lloc[tolower(idescatAlias$alias)==tolower(mun)]
     if (length(qmun)==1) {
@@ -141,7 +142,8 @@ llegeix <- function(url) {
   }
   resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),
                 lcaracs,
-                any=any, segle=segle, tipologia=tipologia)
+                any=any, segle=segle, tipologia=tipologia,
+                diumasia=diumasia)
   return(resultat)
 }
 
@@ -227,19 +229,24 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q483453", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="font", "en"="fountain")
+  } else if ((grepl("^mas((over)?ia)? ", tolower(dades$nom)))|
+             (dades$diumasia & dades$tipologia=="Edifici")) {
+    instr <- afegeix(instr, c(qid, "P31", "Q585956", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="masia", "en"="masia")
   } else if (grepl("^(casa |can |ca n'|cal |ca l'|cases |habitatge )", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q3947", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="casa", "en"="house")
-  } else if (grepl("^mas((over)?ia)? ", tolower(dades$nom))) {
-    instr <- afegeix(instr, c(qid, "P31", "Q585956", 
-                              "S248", "Q9028374", "S854", curl))
-    terme <- c("ca"="masia", "en"="masia")
   } else if (grepl("^(cova|coves|gruta) ", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q35509", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="cova", "en"="cave")
-  } else if (grepl("^balm(a|es) ", tolower(dades$nom))) {
+  } else if (grepl("^avencs? ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q1435994", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="avenc", "en"="pit cave")
+  } else if (grepl("^ba[lu]m(a|es) ", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q35509", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="balma", "en"="rock shelter")
@@ -299,6 +306,10 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q2309609", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="creu", "en"="cross")
+  } else if (grepl("^escultura ", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q860861", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="escultura", "en"="sculpture")
   } else if (grepl("^pous? de (gel|glaç|neu) ", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q3666499", 
                               "S248", "Q9028374", "S854", curl))
@@ -307,6 +318,10 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q198632", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="bòbila", "en"="brickworks")
+  } else if (grepl("^nau industrial", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q9049015", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="nau industrial", "en"="industrial building")
   } else if (grepl("^estació d'aforament", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q505774", 
                               "S248", "Q9028374", "S854", curl))
@@ -346,7 +361,10 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
   } else if(dades$tipologia=="Element urbà") {
     instr <- afegeix(instr, c(qid, "P31", "Q13397636", 
                               "S248", "Q9028374", "S854", curl))
-    terme <- c("ca"="element urbà", "en"="urban element")
+  } else if(dades$tipologia=="Element arquitectònic") {
+    instr <- afegeix(instr, c(qid, "P31", "Q391414", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="element arquitectònic", "en"="architectural element")
   } else if(dades$tipologia=="Conjunt arquitectònic") {
     instr <- afegeix(instr, c(qid, "P31", "Q1497375", 
                               "S248", "Q9028374", "S854", curl))
@@ -359,10 +377,14 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q811534", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="arbre singular", "en"="remarkable tree")
+} else {
+    terme <- c("ca"="lloc", "en"="place")
+    print("Instància desconeguda")
   }
   instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
-  instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))  
-  if (descr) {
+  instr <- afegeix(instr, c(qid, Len, cometes(dades$nom))) 
+  instr <- afegeix(instr, c(qid, "Aca", cometes(paste0(dades$nom," (",dades$municipi,")"))))
+  if (descr & all(!is.na(terme))) {
     instr <- afegeix(instr,c(qid, "Dca", 
                              cometes(paste(terme["ca"],
                                            de(dades$municipi)))))
@@ -412,6 +434,7 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
                               dcrea, 
                               "S248", "Q9028374", "S854", curl))  
   }
+  instr <- afegeix(instr, c(qid, "P973", curl, "P407", "Q7026"))
   return(instr)
 }
 
