@@ -8,3 +8,5 @@ Els recents fan servir el fitxer de noms geogràfics de Catalunya de https://www
 noms_geo.R: substitueix coordenades referenciades al Nomenclàtor amb les del fitxer de noms geogràfics
 
 edificis_ng.R: Importar edificis del fitxer de noms geogràfics. És el model d'altres scripts que importen altres coses.
+
+importar_patrimoni_cutural: App de shiny per importar dades a partir d'una urld dels mapes de patrimoni o de poblesdecatalunya.
