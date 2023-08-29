@@ -120,6 +120,7 @@ llegeixmp <- function(url) {
   cons <- gsub('^.*<div class="field__item">(.*)</div>.*$', "\\1", pag[iest+1])
   estcons <- c("Bo"="Q56557591", "Regular"="Q106379705")
   qcons <- estcons[cons]
+  if (length(qcons)==0) {qcons <- NA}
   if (is.na(qcons)) {
     print(paste("Estat de conservació desconegut:", cons))
   }
@@ -173,7 +174,8 @@ dictipus <- c("Edifici residencial"="Q11755880",
               "Pintura mural urbana (grafit)"="Q219423",
               "Museu"="Q33506",
               "Edifici públic"="Q294422",
-              "Art Públic"="Q4989906")
+              "Art Públic"="Q4989906",
+              "Parcs i jardins"="Q22746")
 
 dictipusen <- c("Edifici residencial"="Residential building",
                 "Edifici religiós"="Religious building",
@@ -181,7 +183,8 @@ dictipusen <- c("Edifici residencial"="Residential building",
                 "Museu"="Museum",
                 "Muralles i torres fortificades"="Wall or tower",
                 "Edifici públic"="Public building",
-                "Art Públic"="Public art")
+                "Art Públic"="Public art",
+                "Parcs i jardins"="Public garden")
 
 fqtipus <- function(tipus, nom="") {
   qtipus <- dictipus[tipus]
@@ -247,6 +250,15 @@ de <- function(nom) {
   denom <- gsub("^d'Els ", "dels ", denom)
   denom <- gsub("^d'El ", "del ", denom)
   return(denom)
+}
+
+#minúscules
+minart <- function(nom) {
+  nom <- gsub("^El ","el ", nom)
+  nom <- gsub("^Els ","els ", nom)
+  nom <- gsub("^La ","la ", nom)
+  nom <- gsub("^Les ","les ", nom)
+  return(nom)
 }
 
 # afegir cometes
@@ -427,6 +439,10 @@ quickmp <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q264458", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="pèrgola", "en"="pergola")
+  } else if (grepl("^(safareig|rentador)", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q1690211", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="safareig", "en"="washhouse")
   } else if (grepl("^sureres ", tolower(dades$nom))) {
     instr <- afegeix(instr, c(qid, "P31", "Q5688661", 
                               "S248", "Q9028374", "S854", curl))
@@ -586,27 +602,6 @@ totinstr <- function(url, qid="LAST", altres=c(""), descr=TRUE) {
 }
 
 
-# Define UI for application 
-ui <- fluidPage(
-
-    # Application title
-    titlePanel("Importar fitxes a Wikidata"),
-
-    # Introducció de dades
-    sidebarLayout(
-        sidebarPanel(
-            textInput("url", "url de mapa de patrimoni o de poblesdecatalunya")
-        ),
-
-        # Resultat
-        mainPanel(
-          "Codi per copiar a QuickStatement:",
-           verbatimTextOutput("instr"),
-          "Dades llegides:",
-           verbatimTextOutput(("dades"))
-        )
-    )
-)
 
 # Define server logic
 server <- function(input, output) {
@@ -633,6 +628,44 @@ server <- function(input, output) {
     })
     
 }
+
+# Define UI for application 
+ui <- fluidPage(
+  
+  # Application title
+  titlePanel("Importar fitxes a Wikidata"),
+  
+  # Introducció de dades
+  sidebarLayout(
+    sidebarPanel(
+      textInput("url", "url de mapa de patrimoni o de poblesdecatalunya"),
+      h3("Instruccions:"),
+      p("1. Enganxeu la url d'una fitxa dels mapes de patrimoni de la Diputacion de Barcelona
+        o de poblesdecatalunya.cat al camp url"),
+      p("2. Copieu el codi obtingut al quickstatements"),
+      p("3. Comproveu a Wikidata l'element que heu creat"),
+      p("Algunes coses a tenir en compte:"),
+      p("- Compte a no crear duplicats."),
+      p("- L'aplicació no es gaire hàbil a l'hora a encertar la instància i la descripció 
+        i pot ser que les hàgiu de corregir. Quan no pot deduir una instància la deixa 
+        en blanc."),
+      p("- Després de crear l'element a Wikidata podeu comprovar si la fitxa
+        té dades que l'aplicació no ha fet servir i que valgui la pena copiar
+        manualment."),
+      p("Comentaris i missatges", 
+        a(href="https://ca.wikipedia.org/wiki/Usuari_Discussi%C3%B3:Pere_prlpz",
+          "aquí"),".")
+    ),
+    
+    # Resultat
+    mainPanel(
+      "Codi per copiar a QuickStatements:",
+      verbatimTextOutput("instr"),
+      "Dades llegides:",
+      verbatimTextOutput(("dades"))
+    )
+  )
+)
 
 # Run the application 
 shinyApp(ui = ui, server = server)
