@@ -45,7 +45,7 @@ getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
   return(getsparql(url, treuurl, coornum))
 }
 
-# importem coves de Wikidata
+# importem masies de Wikidata
 masies <- getquery("SELECT DISTINCT ?item ?municipi ?itemLabel ?municipiLabel
   WHERE {
     ?item wdt:P17 wd:Q29.
@@ -72,7 +72,7 @@ alies <- getquery("SELECT DISTINCT ?item ?alias
 
 taula <- table(masies$itemLabel)
 
-frequents <- names(taula[taula>10])
+frequents <- names(taula[taula>6])
 
 posar <- masies[masies$itemLabel %in% frequents,]
 
