@@ -1,0 +1,11 @@
+num,item,label
+2,Q64124,Eixample
+10,Q250935,Sant Martí
+3,Q753075,Sants-Montjuïc
+6,Q852697,Gràcia
+1,Q941385,Ciutat Vella
+4,Q959944,Districte de les Corts
+8,Q1641049,Nou Barris
+9,Q1650230,Sant Andreu
+5,Q1765582,Sarrià - Sant Gervasi
+7,Q1771488,Horta-Guinardó
