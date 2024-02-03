@@ -9,6 +9,9 @@ library(shiny)
 
 library(httr)
 library(rjson)
+#library(sf)
+#library(oce)
+library(stringr)
 
 treuvar <- function(var, bind) {
   sapply(bind, function(x) (x[[var]]$value))
@@ -145,8 +148,132 @@ llegeixmp <- function(url) {
   return(resultat)
 }
 
+## Funció comuna (però de moment només emprada per ajuntament)
 
-##########################################################33
+# treu el tipus a partir del nom
+identifica <- function(nom, 
+                       default=list(qtipus = "Q41176", 
+                                    terme = c("ca"="edifici", "en"="building"))
+) {
+  if (grepl("aqüeducte", tolower(nom))) {
+    qtipus <- "Q18870689"
+  } else if (grepl("pont|viaducte|passera|aqüeducte", tolower(nom))) {
+    qtipus <- "Q12280"
+    terme <-  c("ca"="pont", "en"="bridge")
+  } else if (grepl("font", tolower(nom))) {
+    qtipus <- "Q483453"
+    terme <- c("ca"="font", "en"="fountain")
+  } else if (grepl("església", tolower(nom))) {
+    qtipus <- "Q16970"
+    terme <- c("ca"="església", "en"="church")
+  } else if (grepl("^mas((over)?ia)? ", tolower(nom))) {
+    qtipus <- "Q585956"
+    terme <- c("ca"="masia", "en"="masia")
+  } else if (grepl("^(casa |can |ca n'|cal |ca l'|cases |habitatge )", tolower(nom))) {
+    qtipus <- "Q3947"
+    terme <- c("ca"="casa", "en"="house")
+  } else if (grepl("^(cova|coves|gruta) ", tolower(nom))) {
+    qtipus <- "Q35509"
+    terme <- c("ca"="cova", "en"="cave")
+  } else if (grepl("^avencs? ", tolower(nom))) {
+    qtipus <- "Q1435994"
+    terme <- c("ca"="avenc", "en"="pit cave")
+  } else if (grepl("^ba[lu]m(a|es) ", tolower(nom))) {
+    qtipus <- "Q35509"
+    terme <- c("ca"="balma", "en"="rock shelter")
+  } else if (grepl("^barrac(a|es) ", tolower(nom))) {
+    qtipus <- "Q2932238"
+    terme <- c("ca"="barraca de vinya", "en"="dry stone hut")
+  } else if (grepl("^mol(í|ins) de vent", tolower(nom))) {
+    qtipus <- "Q38720"
+    terme <- c("ca"="molí de vent", "en"="windmill")
+  } else if (grepl("^mol(í|ins) ", tolower(nom))) {
+    qtipus <- "Q185187"
+    terme <- c("ca"="molí", "en"="mill")
+  } else if (grepl("museu ", tolower(nom))) {
+    qtipus <- "Q33506"
+    terme <- c("ca"="museu", "en"="museum")
+  } else if (grepl("^monuments? ", tolower(nom))) {
+    qtipus <- "Q4989906"
+    terme <- c("ca"="monument", "en"="monument")
+  } else if (grepl("^min(a|es) ", tolower(nom))) {
+    qtipus <- "Q820477"
+    terme <- c("ca"="mina", "en"="mine")
+  } else if (grepl("^pedrer(a|es) ", tolower(nom))) {
+    qtipus <- "Q188040"
+    terme <- c("ca"="pedrera", "en"="quarry")
+  } else if (grepl("^bass(a|es) ", tolower(nom))) {
+    qtipus <- "Q3253281"
+    terme <- c("ca"="bassa", "en"="pond")
+  } else if (grepl("^gorg(a|ues)? ", tolower(nom))) {
+    qtipus <- "Q2385513"
+    terme <- c("ca"="gorg", "en"="stream pond")
+  } else if (grepl("^resclosa ", tolower(nom))) {
+    qtipus <- "Q1066997"
+    terme <- c("ca"="resclosa", "en"="weir")
+  } else if (grepl("^forns? de calç ", tolower(nom))) {
+    qtipus <- "Q59772"
+    terme <- c("ca"="forn de calç", "en"="lime kiln")
+  } else if (grepl("^cementiri ", tolower(nom))) {
+    qtipus <- "Q39614"
+    terme <- c("ca"="cementiri", "en"="cemetery")
+  } else if (grepl("^xemeneia", tolower(nom))) {
+    qtipus <- "Q2962545"
+    terme <- c("ca"="xemeneia", "en"="chimney")
+  } else if (grepl("^creu ", tolower(nom))) {
+    qtipus <- "Q2309609"
+    terme <- c("ca"="creu", "en"="cross")
+  } else if (grepl("^escultura ", tolower(nom))) {
+    qtipus <- "Q860861"
+    terme <- c("ca"="escultura", "en"="sculpture")
+  } else if (grepl("^pous? de (gel|glaç|neu) ", tolower(nom))) {
+    qtipus <- "Q3666499"
+    terme <- c("ca"="pou de gel", "en"="ice cellar")
+  } else if (grepl("^bòbila", tolower(nom))) {
+    qtipus <- "Q198632"
+    terme <- c("ca"="bòbila", "en"="brickworks")
+  } else if (grepl("^nau industrial", tolower(nom))) {
+    qtipus <- "Q9049015"
+    terme <- c("ca"="nau industrial", "en"="industrial building")
+  } else if (grepl("^estació d'aforament", tolower(nom))) {
+    qtipus <- "Q505774"
+    terme <- c("ca"="estació d'aforament", "en"="stream gauge")
+  } else if (grepl("^rellotge de sol ", tolower(nom))) {
+    qtipus <- "Q80793"
+    terme <- c("ca"="rellotge de sol", "en"="sundial")
+  } else if (grepl("^plaça", tolower(nom))) {
+    qtipus <- "Q174782"
+    terme <- c("ca"="plaça", "en"="square")
+  } else if (grepl("^carrer ", tolower(nom))) {
+    qtipus <- "Q79007"
+    terme <- c("ca"="carrer", "en"="street")
+  } else if (grepl("^barri ", tolower(nom))) {
+    qtipus <- "Q123705"
+    terme <- c("ca"="barri", "en"="neighborhood")
+  } else if (grepl("^pèrgol(a|es)[- ]", tolower(nom))) {
+    qtipus <- "Q264458"
+    terme <- c("ca"="pèrgola", "en"="pergola")
+  } else if (grepl("^(safareig|rentador)", tolower(nom))) {
+    qtipus <- "Q1690211"
+    terme <- c("ca"="safareig", "en"="washhouse")
+  } else if (grepl("^sureres ", tolower(nom))) {
+    qtipus <- "Q5688661"
+    terme <- c("ca"="sureda", "en"="cork oak woodland")
+  } else if (grepl("^xaragalls? ", tolower(nom)) ) { 
+    qtipus <- "Q17300700"
+    terme <- c("ca"="xaragall", "en"="badlands")
+  } else if (grepl("habitatge", tolower(nom)) ) { 
+    qtipus <- "Q11755880"
+    terme <- c("ca"="edifici residencial", "en"="residential building")
+  } else {
+    qtipus <- default$qtipus
+    terme <- default$terme
+  }
+  return (list(qtipus=qtipus, terme=terme))
+}
+
+
+##########################################################
 # Funcions per poblesdecatalunya.cat
 
 llegeixpcat <- function(url) {
@@ -161,6 +288,7 @@ llegeixpcat <- function(url) {
   tipus <- gsub("^.*<tr><th>Tipus</th><td>(.*)</td></tr>.*$","\\1", tipus)
   estil <- pag[grepl("<tr><th>Estil</th><td>", pag)]
   estil <- gsub("^.*<tr><th>Estil</th><td>(.*)</td></tr>.*$","\\1", estil)
+  estil <- gsub("</td>.*$", "", estil)
   coords <- pag[grepl('<meta name="geo.position"', pag)]
   coords <- gsub('^.*<meta name="geo.position" content="(.*)"><style type="text/css">.*$',"\\1", coords)
   resultat <- c(list(nom=nom, municipi=mun,  
@@ -171,20 +299,30 @@ llegeixpcat <- function(url) {
 
 dictipus <- c("Edifici residencial"="Q11755880",
               "Edifici religiós"="Q24398318",
+              "Edifici administratiu o institucional"="Q2519340",
+              "Edifici industrial o agrícola"="Q1662011",
+              "Torres i dipòsits d'aigua"="Q274153",
               "Pintura mural urbana (grafit)"="Q219423",
               "Museu"="Q33506",
               "Edifici públic"="Q294422",
               "Art Públic"="Q4989906",
-              "Parcs i jardins"="Q22746")
+              "Parcs i jardins"="Q22746",
+              "Hotels i hostals"="Q63099748",
+              "Conjunt urbanístic"="Q66626342")
 
 dictipusen <- c("Edifici residencial"="Residential building",
                 "Edifici religiós"="Religious building",
+                "Edifici administratiu o institucional"="Administrative building",
+                "Edifici industrial o agrícola"="Industrial or agricultural building",
+                "Torres i dipòsits d'aigua"="Water tower",
                 "Pintura mural urbana (grafit)"="Grafitto",
                 "Museu"="Museum",
                 "Muralles i torres fortificades"="Wall or tower",
                 "Edifici públic"="Public building",
                 "Art Públic"="Public art",
-                "Parcs i jardins"="Public garden")
+                "Parcs i jardins"="Public garden",
+                "Hotels i hostals"="Hotel or hostel",
+                "Conjunt urbanístic"="Urbanistic ensemble")
 
 fqtipus <- function(tipus, nom="") {
   qtipus <- dictipus[tipus]
@@ -202,7 +340,8 @@ fqtipus <- function(tipus, nom="") {
 
 dicestil <- c("Barroc"="Q840829",
               "Modernisme"="Q1122677",
-              "Eclecticisme"="Q2479493")
+              "Eclecticisme"="Q2479493",
+              "Noucentisme"="Q1580216")
 
 completapcat <- function(dades) {
   qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(dades$mun)]
@@ -219,14 +358,44 @@ completapcat <- function(dades) {
   return (dades)
 }
 
-## Funcions comunes llegir
+## Funcions aj bcn #####################
+
+load("dades_cataleg_bcn.RData")
+
+# La resta ajuntament no emprada
+
+# diccionaris i dades
+diccprot <- c(CPA_03_PL="Q107542530")
+districtes <- 
+  structure(list(num = 1:10, 
+                 item = c("Q941385", "Q64124", "Q753075", 
+                          "Q959944", "Q1765582", "Q852697", "Q1771488", "Q1641049", "Q1650230", 
+                          "Q250935"), 
+                 label = c("Ciutat Vella", "Eixample", "Sants-Montjuïc", 
+                           "Districte de les Corts", "Sarrià - Sant Gervasi", "Gràcia", 
+                           "Horta-Guinardó", "Nou Barris", "Sant Andreu", "Sant Martí"
+                 )), 
+            row.names = 1:10, class = "data.frame")
+
+completabcn <- function(dades) {
+  nt <- identifica(dades$nom)
+  dades$terme <- nt$terme
+  dades$qtipus <- nt$qtipus
+  return(dades)
+}
+
+
+# Funcions comunes llegir #######
 
 llegeix <- function(url) {
+  #print(paste("url:", url))
   if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
     return(llegeixmp(url))
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
       return(completapcat(llegeixpcat(url)))
-    } else {
+  } else if (url %in% names(dadesbcn)) {
+    return(completabcn(dadesbcn[[url]]))
+  } else {
     return(list())
   }
 }
@@ -235,6 +404,12 @@ llegeix <- function(url) {
 ##################################################################
 # Funcions per carregar
 ##############################################################
+
+
+# afegir cometes
+cometes <- function(text) {
+  paste0('"',text,'"')
+}
 
 #afegir "de"
 de <- function(nom) {
@@ -258,12 +433,20 @@ minart <- function(nom) {
   nom <- gsub("^Els ","els ", nom)
   nom <- gsub("^La ","la ", nom)
   nom <- gsub("^Les ","les ", nom)
+  nom <- gsub("^L'","l'", nom)
   return(nom)
 }
 
-# afegir cometes
-cometes <- function(text) {
-  paste0('"',text,'"')
+mintitol <- function(nom) {
+  nom <- str_to_title(nom)
+  nom <- gsub(" D'", " d'", nom)
+  nom <- gsub(" De ", " de ", nom)
+  nom <- gsub(" Del ", " del ", nom)
+  nom <- gsub(" Dels ", " dels ", nom)
+  nom <- gsub(" El "," el ", nom)
+  nom <- gsub(" Els "," els ", nom)
+  nom <- gsub(" La "," la ", nom)
+  nom <- gsub(" Les "," les ", nom)
 }
 
 # funció per preparar quickstatements
@@ -322,6 +505,10 @@ quickmp <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     instr <- afegeix(instr, c(qid, "P31", "Q483453", 
                               "S248", "Q9028374", "S854", curl))
     terme <- c("ca"="font", "en"="fountain")
+  } else if (grepl("església", tolower(dades$nom))) {
+    instr <- afegeix(instr, c(qid, "P31", "Q16970", 
+                              "S248", "Q9028374", "S854", curl))
+    terme <- c("ca"="església", "en"="church")
   } else if ((grepl("^mas((over)?ia)? ", tolower(dades$nom)))|
              (dades$diumasia & dades$tipologia=="Edifici")) {
     instr <- afegeix(instr, c(qid, "P31", "Q585956", 
@@ -482,15 +669,19 @@ quickmp <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     terme <- c("ca"="arbre singular", "en"="remarkable tree")
 } else {
     terme <- c("ca"="lloc", "en"="place")
-    print("Instància desconeguda")
+    #print("Instància desconeguda")
   }
   instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
   instr <- afegeix(instr, c(qid, Len, cometes(dades$nom))) 
-  instr <- afegeix(instr, c(qid, "Aca", cometes(paste0(dades$nom," (",dades$municipi,")"))))
+  instr <- afegeix(instr, c(qid, "Aca", 
+                            cometes(
+                              paste0(dades$nom," (",
+                                     minart(dades$municipi),")"))))
   if (descr & all(!is.na(terme))) {
     instr <- afegeix(instr,c(qid, "Dca", 
-                             cometes(paste(terme["ca"],
-                                           de(dades$municipi)))))
+                             cometes(
+                               paste(terme["ca"],
+                                     de(minart(dades$municipi))))))
     instr <- afegeix(instr, c(qid, "Den", 
                               cometes(paste(terme["en"], 'in', 
                                             dades$municipi,
@@ -584,6 +775,55 @@ quickpcat <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE
   return(instr)
 }
 
+# instruccions pel quickstatement ajuntament barcelona
+quickbcn <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE) {
+  curl <- cometes(url)
+  if (qid=="LAST") {
+    instr <- list(c("CREATE"))
+    Lca <- "Lca"
+    Len <- "Len"
+  } else {
+    instr <- list()
+    Lca <- "Aca"
+    Len <- "Aen"
+  }
+  instr <- afegeix(instr, c(qid, Lca, cometes(dades$nom)))
+  instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))
+  if (descr) {
+    instr <- afegeix(instr,c(qid, "Dca", 
+                             cometes(paste(dades$terme["ca"]," de Barcelona"))))
+    instr <- afegeix(instr, c(qid, "Den", 
+                              cometes(paste(dades$terme["en"], "in Barcelona"))))
+  }
+  instr <- afegeix(instr, c(qid, "P131", dades$districte, 
+                            "S248", "Q116698266", "S854", curl))  
+  instr <- afegeix(instr, c(qid, "P625", 
+                            paste0("@", paste0(dades$coord[2:1], 
+                                               collapse="/")),
+                            "S248", "Q116698266", "S854", curl))  
+  instr <- afegeix(instr, c(qid, "P17", "Q29")) 
+  instr <- afegeix(instr, c(qid, "P973", curl, "P407", "Q7026"))
+  instr <- afegeix(instr, c(qid, "P11557", cometes(dades$id), 
+                            "S248", "Q116698266", "S854", curl))
+  if (!is.na(dades$qtipus)) {
+    instr <- afegeix(instr, c(qid, "P31", dades$qtipus, 
+                              "S248", "Q116698266", "S854", curl))  
+  }
+  if (length(dades$qprot)>0) {
+    if (!is.na(dades$qprot)) {
+      instr <- afegeix(instr, c(qid, "P1435", dades$qprot, 
+                                "S248", "Q116698266", "S854", curl))  
+    }
+  }
+  if (length(dades$qestil)>0) {
+    if (!is.na(dades$qestil)) {
+      instr <- afegeix(instr, c(qid, "P149", dades$qestil, 
+                                "S248", "Q116698266", "S854", curl))  
+    }
+  }
+  return(instr)
+}
+
 
 # quick comuú
 quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
@@ -591,22 +831,19 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
     return(quickmp(dades, url, qid=qid, altres=altres, descr=descr))
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
     return(quickpcat(dades, url, qid=qid, altres=altres, descr=descr))
+  } else if (url %in% names(dadesbcn)) {
+    return(quickbcn(dades))
   } else {
     return(list())
   }
 }
 
-
-totinstr <- function(url, qid="LAST", altres=c(""), descr=TRUE) {
-  cat(enc2utf8(paste(unlist(quick(llegeix(url), url, qid, altres, descr)), sep="\t", collapse="\n")))
-}
-
-
+### Aplicació
 
 # Define server logic
 server <- function(input, output) {
   
-  llegit <- reactive(if (nchar(input$url)>10) {llegeix(input$url)
+  llegit <- reactive(if (nchar(input$url)>0) {llegeix(input$url)
     } else {
       list()
     })
@@ -617,16 +854,21 @@ server <- function(input, output) {
       } else {
         cat("Sense dades")
       }
-      # if (nchar(input$url)>10) {totinstr(input$url)
-      # } else {
-      #     cat("Sense dades")
-      #   }
     })
 
     output$dades <- renderPrint({
       llegit()
     })
     
+    output$prova <- renderPrint({
+      print(input$url)
+      print(head(names(dadesbcn)))
+      print(input$url %in% names(dadesbcn))
+      if (input$url %in% names(dadesbcn)) {
+        print("És bcn")
+        print(dadesbcn[[input$url]])
+      }
+    }) 
 }
 
 # Define UI for application 
@@ -638,10 +880,12 @@ ui <- fluidPage(
   # Introducció de dades
   sidebarLayout(
     sidebarPanel(
-      textInput("url", "url de mapa de patrimoni o de poblesdecatalunya"),
+      textInput("url", "url de mapa de patrimoni o de poblesdecatalunya 
+                o id del catàleg de l'Ajuntament"),
       h3("Instruccions:"),
       p("1. Enganxeu la url d'una fitxa dels mapes de patrimoni de la Diputacion de Barcelona
-        o de poblesdecatalunya.cat al camp url"),
+        o de poblesdecatalunya.cat al camp url, o un número d'identificació 
+        del catàleg de patrimoni de l'Ajuntament de Barcelona"),
       p("2. Copieu el codi obtingut al quickstatements"),
       p("3. Comproveu a Wikidata l'element que heu creat"),
       p("Algunes coses a tenir en compte:"),
@@ -652,6 +896,11 @@ ui <- fluidPage(
       p("- Després de crear l'element a Wikidata podeu comprovar si la fitxa
         té dades que l'aplicació no ha fet servir i que valgui la pena copiar
         manualment."),
+      p("- Les dades dels mapes de patrimoni i de poblesdecatalunya s'agafen
+        de la url que heu enganxat. Les de patrimoni de l'Ajuntament de Barcelona
+        s'agafen d'una versió desada de les", 
+        a(href="https://opendata-ajuntament.barcelona.cat/data/ca/dataset/patrimoni-arquitectonic-protegit",
+          "dades obertes.")),
       p("Comentaris i missatges", 
         a(href="https://ca.wikipedia.org/wiki/Usuari_Discussi%C3%B3:Pere_prlpz",
           "aquí"),".")
@@ -662,7 +911,9 @@ ui <- fluidPage(
       "Codi per copiar a QuickStatements:",
       verbatimTextOutput("instr"),
       "Dades llegides:",
-      verbatimTextOutput(("dades"))
+      verbatimTextOutput(("dades"))#,
+      #"Sortida de prova:",
+      #verbatimTextOutput(("prova"))
     )
   )
 )
