@@ -13,7 +13,7 @@ desllista <- function(x) {
   return(unlist(x))
 }
 
-getsparql <- function(url, coornum=TRUE) {
+getsparql <- function(url, treuurl=TRUE, coornum=TRUE) {
   cont <- fromJSON(rawToChar(content(GET(url))))
   nomsvars <- cont$head$vars
   llista <- lapply(nomsvars, treuvar, bind=cont$results$bindings)
@@ -28,13 +28,64 @@ getsparql <- function(url, coornum=TRUE) {
       df$lon <- as.numeric(df$lon)
     }
   }
+  if (treuurl) {
+    for (var in names(df)) {
+      if (class(df[[var]])=="character") {
+        df[[var]] <- gsub("http://www.wikidata.org/entity/", "", df[[var]])
+      }
+    }
+  }
   return(df)
 }
 
-items1 <- getsparql("https://query.wikidata.org/sparql?query=%23etiquetes%20items%20de%20Catalunya%20que%20tenen%20coordenades%0ASELECT%20DISTINCT%20%3Fitem%20%3Fnameca%20%3Fnameen%0AWHERE%20%7B%0A%20%20%3Fitem%20wdt%3AP17%20wd%3AQ29.%0A%20%20%3Fitem%20wdt%3AP131*%20wd%3AQ5705.%0A%20%20%3Fitem%20wdt%3AP625%20%5B%5D.%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22ca%22%20.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameca%0A%7D%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22en%22.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameen%0A%7D%0A%7D%0A%23ORDER%20BY%20ASC%20(%3Fname)%0A%23defaultView%3ATable")
+getquery <- function(query, treuurl=TRUE, coornum=TRUE) {
+  url <- paste0("https://query.wikidata.org/sparql?query=", URLencode(query))
+  return(getsparql(url, treuurl, coornum))
+}
+
+
+partcat <- c("Q18265", "Q1030024", "Q1113384", "Q1113390", 
+             #"Q1462520",#ponent
+             "Q12732","Q12726","Q12728","Q12733","Q12727","Q12729",
+             "Q1849804", "Q579384",
+             "Q12600", "Q13948", "Q14303", "Q15348", "Q15351","Q15352") 
+
+# baixa tots els elements d'un lloc de Catalunya
+totlloc <- function(qlloc) {
+  url <- paste0('SELECT DISTINCT ?item ?nameca ?nameen
+WHERE {
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P131* wd:',qlloc,'.
+  ?item wdt:P625 [].
+SERVICE wikibase:label {
+bd:serviceParam wikibase:language "ca" .
+?item rdfs:label ?nameca
+}
+SERVICE wikibase:label {
+bd:serviceParam wikibase:language "en".
+?item rdfs:label ?nameen
+}
+}')
+  tot <- getquery(url)
+  tot <- tot[!duplicated(tot),]
+  resum <- tot[nchar(tot$idescat)>2,]
+  afegir <- tot[!(tot$item %in% resum$item),]
+  resum <- rbind(resum, afegir)
+  return(resum)
+}
+
+totcat <- data.frame()
+for (lloc in partcat) {
+  print(lloc)
+  totcat <- rbind(totcat, totlloc(lloc))
+}
+totcat <- totcat[!duplicated(totcat),]
+
+
+#items1 <- getsparql("https://query.wikidata.org/sparql?query=%23etiquetes%20items%20de%20Catalunya%20que%20tenen%20coordenades%0ASELECT%20DISTINCT%20%3Fitem%20%3Fnameca%20%3Fnameen%0AWHERE%20%7B%0A%20%20%3Fitem%20wdt%3AP17%20wd%3AQ29.%0A%20%20%3Fitem%20wdt%3AP131*%20wd%3AQ5705.%0A%20%20%3Fitem%20wdt%3AP625%20%5B%5D.%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22ca%22%20.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameca%0A%7D%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22en%22.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameen%0A%7D%0A%7D%0A%23ORDER%20BY%20ASC%20(%3Fname)%0A%23defaultView%3ATable")
 items2 <- getsparql("https://query.wikidata.org/sparql?query=%23etiquetes%20items%20de%20Catalunya%20que%20tenen%20protecci%C3%B3%0ASELECT%20DISTINCT%20%3Fitem%20%3Fnameca%20%3Fnameen%0AWHERE%20%7B%0A%20%20%3Fitem%20wdt%3AP17%20wd%3AQ29.%0A%20%20%3Fitem%20wdt%3AP131*%20wd%3AQ5705.%0A%20%20%3Fitem%20wdt%3AP1435%20%5B%5D.%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22ca%22%20.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameca%0A%7D%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22en%22.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameen%0A%7D%0A%7D%0A%23ORDER%20BY%20ASC%20(%3Fname)%0A%23defaultView%3ATable")
 items3 <- getsparql("https://query.wikidata.org/sparql?query=%23etiquetes%20items%20a%20IPAC%0ASELECT%20DISTINCT%20%3Fitem%20%3Fnameca%20%3Fnameen%0AWHERE%20%7B%0A%20%20%3Fitem%20wdt%3AP1600%20%5B%5D.%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22ca%22%20.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameca%0A%7D%0ASERVICE%20wikibase%3Alabel%20%7B%0Abd%3AserviceParam%20wikibase%3Alanguage%20%22en%22.%0A%3Fitem%20rdfs%3Alabel%20%3Fnameen%0A%7D%0A%7D%0A%23ORDER%20BY%20ASC%20(%3Fname)%0A%23defaultView%3ATable")
-items <- rbind(items1, items2, items3)
+items <- rbind(totcat, items2, items3)
 items <- unique(items)
 
 itemq <- function(item) {gsub("http://www.wikidata.org/entity/", "",
