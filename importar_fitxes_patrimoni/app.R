@@ -71,6 +71,12 @@ if (file.exists("idescat.RData")) { # PER FER: path adaptable
   save(idescat, idescatAlias, file="idescat.RData")
 }
 
+# per separar les url de l'entrada
+separa <- function(x) {
+  sep <- unlist(strsplit(x, ",", fixed=TRUE))
+  sep <- str_trim(sep)
+  return(sep)
+}
 
 ## funcions per llegir pàgina mapa patrimoni cultural
 
@@ -100,8 +106,8 @@ llegeixmp <- function(url) {
   nom <- gsub("^.*<title>(.*)\\|.*</title>.*$", "\\1", tit)
   nom <- str_trim(nom)
   nom <- unescape_html(gsub(" $","",nom))
-  mun <- pag[grepl('<a href=".*/municipi/.*">.*</a>', pag)]
-  mun <- gsub('<a href=".*/municipi/.*">(.*)</a>', "\\1", mun)
+  mun <- pag[grepl('<meta name="geo.placename" content=".*" />', pag)]
+  mun <- gsub('<meta name="geo.placename" content="(.*)" />', "\\1", mun)
   mun <- unescape_html((str_trim(mun)))
   nom <- gsub(paste0("\\. ",mun), "", nom)
   qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(mun)]
@@ -144,7 +150,8 @@ llegeixmp <- function(url) {
   resultat <- c(list(nom=nom, municipi=mun, qmun=qmun, qcons=qcons),
                 lcaracs,
                 any=any, segle=segle, tipologia=tipologia,
-                diumasia=diumasia, diuescultura=diuescultura)
+                diumasia=diumasia, diuescultura=diuescultura,
+                url=url)
   return(resultat)
 }
 
@@ -291,8 +298,11 @@ llegeixpcat <- function(url) {
   estil <- gsub("</td>.*$", "", estil)
   coords <- pag[grepl('<meta name="geo.position"', pag)]
   coords <- gsub('^.*<meta name="geo.position" content="(.*)"><style type="text/css">.*$',"\\1", coords)
+  adreca <- pag[grep("Premeu per a veure la situacio de l'element al mapa", pag)+1]
+  adreca <- gsub("</td></tr>", "", adreca)
   resultat <- c(list(nom=nom, municipi=mun,  
                      tipus=tipus, estil=estil, coords=coords,
+                     adreca=adreca,
                      url=url))
   return(resultat)
 }
@@ -308,7 +318,9 @@ dictipus <- c("Edifici residencial"="Q11755880",
               "Art Públic"="Q4989906",
               "Parcs i jardins"="Q22746",
               "Hotels i hostals"="Q63099748",
-              "Conjunt urbanístic"="Q66626342")
+              "Conjunt urbanístic"="Q66626342",
+              "Masia"="Q585956",
+              "Edifici escolar"="Q1244442")
 
 dictipusen <- c("Edifici residencial"="Residential building",
                 "Edifici religiós"="Religious building",
@@ -321,8 +333,12 @@ dictipusen <- c("Edifici residencial"="Residential building",
                 "Edifici públic"="Public building",
                 "Art Públic"="Public art",
                 "Parcs i jardins"="Public garden",
-                "Hotels i hostals"="Hotel or hostel",
-                "Conjunt urbanístic"="Urbanistic ensemble")
+                "Hotels i hostals"="Hotel or hostel building",
+                "Conjunt urbanístic"="Urbanistic ensemble",
+                "Masia"="Masia",
+                "Edifici escolar"="School building")
+
+dictipusdesc <- c("Hotels i hostals"="Edifici hoteler")
 
 fqtipus <- function(tipus, nom="") {
   qtipus <- dictipus[tipus]
@@ -338,23 +354,57 @@ fqtipus <- function(tipus, nom="") {
   return(qtipus)
 } 
 
-dicestil <- c("Barroc"="Q840829",
-              "Modernisme"="Q1122677",
-              "Eclecticisme"="Q2479493",
-              "Noucentisme"="Q1580216")
+dicestil <- c("modernisme"="Q1122677",
+              "modernista"="Q1122677",
+              "noucentisme"="Q1580216",
+              "noucentista"="Q1580216",
+              "historicisme"="Q51879601",
+              "historicista"="Q51879601",
+              "romànic"="Q46261",
+              "gòtic"="Q176483",
+              "gòtic tardà"="Q10924220",
+              "renaixentista"="Q236122",
+              "renaixement"="Q236122",
+              "barroc"="Q840829",
+              "neoclàssic"="Q54111",
+              "neoclassicisme"="Q54111",
+              "neogòtic"="Q186363",
+              "historicisme neogòtic"="Q186363",
+              "neomudèjar"="Q614624",
+              "neoromànic"="Q744373",
+              "arquitectura popular"="Q930314",
+              "popular"="Q930314",
+              "obra popular"="Q930314",
+              "eclecticisme"="Q2479493",
+              "eclèctic"="Q2479493",
+              "racionalisme"="Q2535546",
+              "racionalista"="Q2535546",
+              "arquitectura del ferro"="Q900557")
+
+# coses que no són municipìs posades com a municipi
+dicmun <- c("Monestir de Sant Cugat del Vallès"="Q13936")
 
 completapcat <- function(dades) {
-  qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(dades$mun)]
+  qmun <- idescat$lloc[tolower(idescat$llocLabel)==tolower(dades$municipi)]
   if (length(qmun)==0) {
-    qmun <- idescatAlias$lloc[tolower(idescatAlias$alias)==tolower(dades$mun)]
-    if (length(qmun)==1) {
-      mun <- idescat$llocLabel[idescat$lloc==qmun]
+    qmun <- idescatAlias$lloc[tolower(idescatAlias$alias)==tolower(dades$municipi)]
+    if (length(qmun)==0) {
+      qmun <- dicmun[dades$municipi]
     }
+    if (length(qmun)==1 & !is.na(qmun)) {
+      dades$municipi <- idescat$llocLabel[idescat$lloc==qmun]
+    } 
   }
   dades$qmun <- qmun
-  dades$qestil <- dicestil[dades$estil]
+  dades$qestil <- dicestil[tolower(dades$estil)]
   dades$qtipus <- fqtipus(dades$tipus)
   dades$tipusen <- dictipusen[dades$tipus]
+  if (dades$tipus %in% names(dictipusdesc)) {
+    dades$tipus <- dictipusdesc[dades$tipus]
+  }
+  if (is.na(dades$tipusen)) {
+    dades$tipusen <- identifica(dades$nom)$terme["en"] # per si de cas no existeix al diccionari
+  }
   return (dades)
 }
 
@@ -371,8 +421,8 @@ districtes <-
                  item = c("Q941385", "Q64124", "Q753075", 
                           "Q959944", "Q1765582", "Q852697", "Q1771488", "Q1641049", "Q1650230", 
                           "Q250935"), 
-                 label = c("Ciutat Vella", "Eixample", "Sants-Montjuïc", 
-                           "Districte de les Corts", "Sarrià - Sant Gervasi", "Gràcia", 
+                 label = c("Ciutat Vella", "l'Eixample", "Sants-Montjuïc", 
+                           "les Corts", "Sarrià - Sant Gervasi", "Gràcia", 
                            "Horta-Guinardó", "Nou Barris", "Sant Andreu", "Sant Martí"
                  )), 
             row.names = 1:10, class = "data.frame")
@@ -381,6 +431,11 @@ completabcn <- function(dades) {
   nt <- identifica(dades$nom)
   dades$terme <- nt$terme
   dades$qtipus <- nt$qtipus
+  dades$qestil <- dicestil[tolower(dades$estil)][1]
+  nomdistricte <- districtes$label[districtes$item==dades$districte]
+  nomdistricte <- gsub("Districte de ","", nomdistricte)
+  dades$aldistricte <- paste("al districte de", nomdistricte)
+  dades$aldistricteen <- paste("in", nomdistricte, "district")
   return(dades)
 }
 
@@ -772,6 +827,10 @@ quickpcat <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE
                                 "S248", "Q119625160", "S854", curl))  
     }
   }
+  if (!is.na(dades$adreca)) {
+    instr <- afegeix(instr, c(qid, "P6375", paste0("ca:",cometes(dades$adreca)), 
+                              "S248", "Q119625160", "S854", curl))
+  }
   return(instr)
 }
 
@@ -791,9 +850,11 @@ quickbcn <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE)
   instr <- afegeix(instr, c(qid, Len, cometes(dades$nom)))
   if (descr) {
     instr <- afegeix(instr,c(qid, "Dca", 
-                             cometes(paste(dades$terme["ca"]," de Barcelona"))))
+                             cometes(paste(dades$terme["ca"]," de Barcelona",
+                                           dades$aldistricte))))
     instr <- afegeix(instr, c(qid, "Den", 
-                              cometes(paste(dades$terme["en"], "in Barcelona"))))
+                              cometes(paste(dades$terme["en"], "in Barcelona",
+                                            dades$aldistricteen))))
   }
   instr <- afegeix(instr, c(qid, "P131", dades$districte, 
                             "S248", "Q116698266", "S854", curl))  
@@ -826,7 +887,10 @@ quickbcn <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE)
 
 
 # quick comuú
-quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
+quick <- function(dades, url=NULL, qid="LAST", altres=c(""), descr=TRUE) {
+  if (is.null(url)) {url <- dades$url}
+  url <- gsub("https://ajuntament.barcelona.cat/informaciourbanistica/cerca/ca/fitxa/|/--/--/cp/",
+              "", url)
   if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
     return(quickmp(dades, url, qid=qid, altres=altres, descr=descr))
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
@@ -843,17 +907,25 @@ quick <- function(dades, url, qid="LAST", altres=c(""), descr=TRUE) {
 # Define server logic
 server <- function(input, output) {
   
-  llegit <- reactive(if (nchar(input$url)>0) {llegeix(input$url)
+  urlsep <- reactive(separa(input$url))
+  
+  llegit <- reactive(if (nchar(input$url)>0) {lapply(urlsep(), llegeix)
     } else {
       list()
     })
 
     output$instr <- renderPrint({
       if (length(llegit())>0) {
-        cat(enc2utf8(paste(unlist(quick(llegit(), input$url)), sep="\t", collapse="\n")))
+        cat(sapply(llegit(), function(x) {
+          enc2utf8(paste0(paste(unlist(quick(x)), sep="\t", collapse="\n"), "\n"))
+        }))
       } else {
         cat("Sense dades")
       }
+    })
+    
+    output$urlsep <- renderPrint({
+      urlsep()
     })
 
     output$dades <- renderPrint({
@@ -888,8 +960,9 @@ ui <- fluidPage(
         del catàleg de patrimoni de l'Ajuntament de Barcelona"),
       p("2. Copieu el codi obtingut al quickstatements"),
       p("3. Comproveu a Wikidata l'element que heu creat"),
+      p("Si voleu crear més d'un element a la vegada, entreu les url o els números separats amb comes."),
       p("Algunes coses a tenir en compte:"),
-      p("- Compte a no crear duplicats."),
+      p("- Compte a no crear duplicats a Wikidata."),
       p("- L'aplicació no es gaire hàbil a l'hora a encertar la instància i la descripció 
         i pot ser que les hàgiu de corregir. Quan no pot deduir una instància la deixa 
         en blanc."),
@@ -900,7 +973,7 @@ ui <- fluidPage(
         de la url que heu enganxat. Les de patrimoni de l'Ajuntament de Barcelona
         s'agafen d'una versió desada de les", 
         a(href="https://opendata-ajuntament.barcelona.cat/data/ca/dataset/patrimoni-arquitectonic-protegit",
-          "dades obertes.")),
+          "dades obertes"), " que no inclou tots els elements del catàleg."),
       p("Comentaris i missatges", 
         a(href="https://ca.wikipedia.org/wiki/Usuari_Discussi%C3%B3:Pere_prlpz",
           "aquí"),".")
@@ -910,6 +983,8 @@ ui <- fluidPage(
     mainPanel(
       "Codi per copiar a QuickStatements:",
       verbatimTextOutput("instr"),
+      "Dades entrades:",
+      verbatimTextOutput("urlsep"),
       "Dades llegides:",
       verbatimTextOutput(("dades"))#,
       #"Sortida de prova:",
