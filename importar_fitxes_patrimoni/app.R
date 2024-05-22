@@ -279,9 +279,7 @@ identifica <- function(nom,
   return (list(qtipus=qtipus, terme=terme))
 }
 
-
-##########################################################
-# Funcions per poblesdecatalunya.cat
+## Funcions per poblesdecatalunya.cat
 
 llegeixpcat <- function(url) {
   pag <- readLines(url, encoding="UTF-8")
@@ -289,6 +287,12 @@ llegeixpcat <- function(url) {
   tit <- gsub("^.*<title>(.*)</title>.*$", "\\1", tit)
   tittrossos <- unlist(strsplit(tit, " - "))
   nom <- tittrossos[1]
+  if (grepl("<i>",nom)) {
+    titol <- gsub("^.*<i>(.*)</i>.*$","\\1",nom)
+    nom <- gsub("</?i>","",nom)
+  } else {
+    titol <- NA
+  }
   mun <- tittrossos[2]
   mun <- trimws(gsub("\\|.*$","",mun))
   tipus <- pag[grepl("<tr><th>Tipus</th><td>", pag)]
@@ -302,7 +306,7 @@ llegeixpcat <- function(url) {
   adreca <- gsub("</td></tr>", "", adreca)
   resultat <- c(list(nom=nom, municipi=mun,  
                      tipus=tipus, estil=estil, coords=coords,
-                     adreca=adreca,
+                     adreca=adreca, titol=titol,
                      url=url))
   return(resultat)
 }
@@ -440,19 +444,27 @@ completabcn <- function(dades) {
 }
 
 
-# Funcions comunes llegir #######
+## Funcions comunes llegir #######
+
+# funció comuna d'arreglar el llegit per tots els origens
+poleix_llegit <- function(dades) {
+  dades$nom <- gsub("</?i>","",dades$nom)
+  return(dades)
+}
 
 llegeix <- function(url) {
   #print(paste("url:", url))
   if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
-    return(llegeixmp(url))
+    dades <- llegeixmp(url)
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
-      return(completapcat(llegeixpcat(url)))
+    dades <- completapcat(llegeixpcat(url))
   } else if (url %in% names(dadesbcn)) {
-    return(completabcn(dadesbcn[[url]]))
+    dades <- completabcn(dadesbcn[[url]])
   } else {
-    return(list())
+    dades <- list()
   }
+  dades <- poleix_llegit(dades)
+  return(dades)
 }
 
 
@@ -830,6 +842,11 @@ quickpcat <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE
   if (!is.na(dades$adreca)) {
     instr <- afegeix(instr, c(qid, "P6375", paste0("ca:",cometes(dades$adreca)), 
                               "S248", "Q119625160", "S854", curl))
+  }
+  if (!is.na(dades$titol)) {
+    instr <- afegeix(instr, c(qid, "P1476", paste0("ca:",cometes(dades$titol)), 
+                              "S248", "Q119625160", "S854", curl))
+    instr <- afegeix(instr, c(qid, "Aca", cometes(dades$titol)))
   }
   return(instr)
 }
