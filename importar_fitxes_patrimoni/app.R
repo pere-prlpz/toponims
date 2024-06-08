@@ -73,7 +73,12 @@ if (file.exists("idescat.RData")) { # PER FER: path adaptable
 
 # per separar les url de l'entrada
 separa <- function(x) {
-  sep <- unlist(strsplit(x, ",", fixed=TRUE))
+  if(grepl("\\n", x)) {
+    separador <- "[|;]"
+  } else {
+    separador <- "[,;|]"
+  }
+  sep <- unlist(strsplit(x, separador, fixed=FALSE))
   sep <- str_trim(sep)
   return(sep)
 }
@@ -200,6 +205,9 @@ identifica <- function(nom,
   } else if (grepl("museu ", tolower(nom))) {
     qtipus <- "Q33506"
     terme <- c("ca"="museu", "en"="museum")
+  } else if (grepl("^(antiga )?(farmàcia) ", tolower(nom))) {
+    qtipus <- "Q13107184"
+    terme <- c("ca"="farmàcia", "en"="pharmacy")
   } else if (grepl("^monuments? ", tolower(nom))) {
     qtipus <- "Q4989906"
     terme <- c("ca"="monument", "en"="monument")
@@ -272,6 +280,9 @@ identifica <- function(nom,
   } else if (grepl("habitatge", tolower(nom)) ) { 
     qtipus <- "Q11755880"
     terme <- c("ca"="edifici residencial", "en"="residential building")
+  } else if (grepl("^conjunt ", tolower(nom)) ) { 
+    qtipus <- "Q66626342"
+    terme <- c("ca"="conjunt urbà", "en"="urban ensemble")
   } else {
     qtipus <- default$qtipus
     terme <- default$terme
@@ -383,7 +394,8 @@ dicestil <- c("modernisme"="Q1122677",
               "eclèctic"="Q2479493",
               "racionalisme"="Q2535546",
               "racionalista"="Q2535546",
-              "arquitectura del ferro"="Q900557")
+              "arquitectura del ferro"="Q900557",
+              "arquitectura industrial"="Q1477476")
 
 # coses que no són municipìs posades com a municipi
 dicmun <- c("Monestir de Sant Cugat del Vallès"="Q13936")
@@ -419,17 +431,42 @@ load("dades_cataleg_bcn.RData")
 # La resta ajuntament no emprada
 
 # diccionaris i dades
-diccprot <- c(CPA_03_PL="Q107542530")
+# inclou format web i text
+diccprot <- c(CPA_03_PL="Q107542530",
+              "Béns d'interès documental(D)"="Q112670375",
+              "Establiments d'interès(E2)"="Q115459499")
 districtes <- 
   structure(list(num = 1:10, 
                  item = c("Q941385", "Q64124", "Q753075", 
                           "Q959944", "Q1765582", "Q852697", "Q1771488", "Q1641049", "Q1650230", 
                           "Q250935"), 
-                 label = c("Ciutat Vella", "l'Eixample", "Sants-Montjuïc", 
-                           "les Corts", "Sarrià - Sant Gervasi", "Gràcia", 
+                 label = c("Ciutat Vella", "Eixample", "Sants-Montjuïc", 
+                           "Districte de les Corts", "Sarrià - Sant Gervasi", "Gràcia", 
                            "Horta-Guinardó", "Nou Barris", "Sant Andreu", "Sant Martí"
                  )), 
             row.names = 1:10, class = "data.frame")
+districtes$curt <- gsub("Districte de ","", districtes$label)
+districtes$curt <- gsub(" - ","-", districtes$curt)
+
+# llegeix catàleg de copiat i enganxat text
+llegeixbcntext <- function(text) {
+  linies <- unlist(strsplit(text,"\n", fixed=TRUE))
+  nom <- mintitol(linies[which(linies=="Denominació")+1])
+  adreca <- mintitol(gsub(" \\(1\\)$","",gsub("^.*\\t","",linies[grepl("^Adreça",linies)])))
+  id <- gsub("^.*\\t","",linies[grepl("^Identificador",linies)])
+  numdistricte <- which(tolower(districtes$curt)==tolower(gsub("^.*\\t","",linies[grepl("^Districte",linies)])))[1]
+  districte <- districtes$item[numdistricte]
+  url <- paste0("https://ajuntament.barcelona.cat/informaciourbanistica/cerca/ca/fitxa/",
+                id,
+                "/--/--/cp/")
+  qprot <- diccprot[gsub("^.*\\t","",linies[grepl("^Nivell Protecció",linies)])]
+  any <- gsub("^.*\\t","",linies[grepl("^Època",linies)])
+  estil <- gsub("^.*\\t","",linies[grepl("^Estil",linies)])
+  return(list(nom=nom[1], id=id, qprot=qprot[1], 
+              url=url, districte=districte[1], numdistricte=numdistricte[1],
+              qtipus="Q41176", estil=estil, adreca=adreca))
+}
+
 
 completabcn <- function(dades) {
   nt <- identifica(dades$nom)
@@ -454,7 +491,10 @@ poleix_llegit <- function(dades) {
 
 llegeix <- function(url) {
   #print(paste("url:", url))
-  if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
+  if (grepl("Dades Generals", url, fixed=TRUE) & 
+      grepl("Identificador", url, fixed=TRUE)) {
+    dades <- completabcn(llegeixbcntext(url))
+  } else if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
     dades <- llegeixmp(url)
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
     dades <- completapcat(llegeixpcat(url))
@@ -874,11 +914,13 @@ quickbcn <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE)
                                             dades$aldistricteen))))
   }
   instr <- afegeix(instr, c(qid, "P131", dades$districte, 
-                            "S248", "Q116698266", "S854", curl))  
-  instr <- afegeix(instr, c(qid, "P625", 
-                            paste0("@", paste0(dades$coord[2:1], 
-                                               collapse="/")),
-                            "S248", "Q116698266", "S854", curl))  
+                            "S248", "Q116698266", "S854", curl))
+  if ("coord" %in% names(dades)) {
+    instr <- afegeix(instr, c(qid, "P625", 
+                              paste0("@", paste0(dades$coord[2:1], 
+                                                 collapse="/")),
+                              "S248", "Q116698266", "S854", curl))  
+  }
   instr <- afegeix(instr, c(qid, "P17", "Q29")) 
   instr <- afegeix(instr, c(qid, "P973", curl, "P407", "Q7026"))
   instr <- afegeix(instr, c(qid, "P11557", cometes(dades$id), 
@@ -899,20 +941,24 @@ quickbcn <- function(dades, url=dades$url, qid="LAST", altres=c(""), descr=TRUE)
                                 "S248", "Q116698266", "S854", curl))  
     }
   }
+  if ("adreca" %in% names(dades)) {
+    if (!is.na(dades$adreca)) {
+      instr <- afegeix(instr, c(qid, "P6375", paste0("ca:",cometes(dades$adreca)), 
+                                "S248", "Q116698266", "S854", curl))
+    }
+  }
   return(instr)
 }
-
 
 # quick comuú
 quick <- function(dades, url=NULL, qid="LAST", altres=c(""), descr=TRUE) {
   if (is.null(url)) {url <- dades$url}
-  url <- gsub("https://ajuntament.barcelona.cat/informaciourbanistica/cerca/ca/fitxa/|/--/--/cp/",
-              "", url)
   if (grepl("patrimonicultural.diba.cat",url, fixed = TRUE)) {
     return(quickmp(dades, url, qid=qid, altres=altres, descr=descr))
   } else if (grepl("poblesdecatalunya.cat",url, fixed = TRUE)) {
     return(quickpcat(dades, url, qid=qid, altres=altres, descr=descr))
-  } else if (url %in% names(dadesbcn)) {
+  } else if (grepl("ajuntament.barcelona.cat/informaciourbanistica",url, 
+                   fixed = TRUE)) {
     return(quickbcn(dades))
   } else {
     return(list())
@@ -957,6 +1003,7 @@ server <- function(input, output) {
         print("És bcn")
         print(dadesbcn[[input$url]])
       }
+      print(sapply(llegit(), quick))
     }) 
 }
 
@@ -969,15 +1016,17 @@ ui <- fluidPage(
   # Introducció de dades
   sidebarLayout(
     sidebarPanel(
-      textInput("url", "url de mapa de patrimoni o de poblesdecatalunya 
+      textAreaInput("url", "url de mapa de patrimoni o de poblesdecatalunya 
                 o id del catàleg de l'Ajuntament"),
       h3("Instruccions:"),
       p("1. Enganxeu la url d'una fitxa dels mapes de patrimoni de la Diputacion de Barcelona
         o de poblesdecatalunya.cat al camp url, o un número d'identificació 
-        del catàleg de patrimoni de l'Ajuntament de Barcelona"),
+        del catàleg de patrimoni de l'Ajuntament de Barcelona (pels elements de nivell C)",
+        "o copieu-hi el text dels apartats de denominació i dades generals del catàleg",
+        "(pels elements de nivell D i establiments)"),
       p("2. Copieu el codi obtingut al quickstatements"),
       p("3. Comproveu a Wikidata l'element que heu creat"),
-      p("Si voleu crear més d'un element a la vegada, entreu les url o els números separats amb comes."),
+      p("Si voleu crear més d'un element a la vegada, entreu les dades separades amb | o ;"),
       p("Algunes coses a tenir en compte:"),
       p("- Compte a no crear duplicats a Wikidata."),
       p("- L'aplicació no es gaire hàbil a l'hora a encertar la instància i la descripció 
