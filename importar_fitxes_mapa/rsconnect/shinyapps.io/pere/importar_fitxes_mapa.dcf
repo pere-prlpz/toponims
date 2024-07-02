@@ -1,0 +1,12 @@
+name: importar_fitxes_mapa
+title: importar_fitxes_mapa
+username: pere
+account: pere
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12186340
+bundleId: 8816389
+url: https://pere.shinyapps.io/importar_fitxes_mapa/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
