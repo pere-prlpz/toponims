@@ -70,10 +70,39 @@ queryvaris1 <- 'SELECT DISTINCT ?item ?itemLabel {
   SERVICE wikibase:label { bd:serviceParam wikibase:language "ca" .}
 }'
 
-#importem (triar-ne un)
-#labels <- getquery(querymun)
-#labels <- getquery(queryadm1)
-labels <- getquery(queryvaris1)
+querymunt <- 'SELECT DISTINCT ?item ?itemLabel {
+  VALUES ?inst {wd:Q8502 wd:Q207326}
+  ?lloc wdt:P31 wd:Q33146843.
+  ?item wdt:P131* ?lloc.
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P31 ?inst.  
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "ca" .}
+}'
+
+querypob <- 'SELECT DISTINCT ?item ?itemLabel {
+  VALUES ?inst {wd:Q3055118 wd:Q11939023}
+  ?lloc wdt:P31 wd:Q33146843.
+  ?item wdt:P131* ?lloc.
+  ?item wdt:P17 wd:Q29.
+  ?item wdt:P31 ?inst.  
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "ca" .}
+}'
+
+
+
+# importem (triar-ne un)
+#labels <- getquery(querymun); lab1 <- labels
+#labels <- getquery(queryadm1); lab2 <- labels
+#labels <- getquery(queryvaris1); lab3 <- labels
+#labels <- getquery(querymunt); lab4 <- labels
+#labels <- rbind(lab1, lab2, lab3, lab4)
+
+# o tots a la vegada (triga una mica)
+labels <- rbind(getquery(querymun), getquery(queryadm1), 
+                getquery(queryvaris1),getquery(querymunt),
+                getquery(querypob))
+table(duplicated(labels))
+labels <- labels[!duplicated(labels),]
 
 ###### Correcció
 posar <- labels[grepl("^(L'|(El|La|Els|Les) )",labels$itemLabel),]
